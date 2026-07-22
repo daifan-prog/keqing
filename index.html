@@ -224,7 +224,73 @@ function RankTracker() {
     setStorageReady(true);
   }, []);
 
-  const [autoSync, setAutoSync] = useState(null); // { updatedOn, fetchedAt, totalPlayers } once a successful auto-sync happens
+  const [autoSync, setAutoSync] = useState(null); // { updatedOn, fetchedAt, totalPlayers } once a successful sync happens
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState("");
+
+  const syncFromDataFile = async (isManual) => {
+    if (isManual) {
+      setSyncing(true);
+      setSyncError("");
+    }
+    try {
+      const res = await fetch("./data/leaderboard.json", { cache: "no-store" });
+      if (!res.ok) {
+        if (isManual) setSyncError("No synced data found yet — trigger the GitHub Action first, then try again.");
+        return;
+      }
+      const data = await res.json();
+
+      if (data.top20 && Array.isArray(data.top20.rows) && data.top20.rows.length > 0) {
+        setTop20((prevTop20) => {
+          if (prevTop20.updatedOn && prevTop20.updatedOn !== data.top20.updatedOn) {
+            setTop20History((prevHist) => {
+              if (prevHist.some((h) => h.updatedOn === prevTop20.updatedOn)) return prevHist;
+              const merged = prevHist.concat([prevTop20]).sort((a, b) => (a.updatedOn < b.updatedOn ? 1 : -1));
+              saveJSON(TOP20_HISTORY_KEY, merged);
+              return merged;
+            });
+          }
+          saveJSON(TOP20_KEY, data.top20);
+          return data.top20;
+        });
+        setTop20Form(data.top20);
+        setHasSavedTop20(true);
+        setEditingTop20(false);
+      }
+
+      if (data.build) {
+        setBuild(data.build);
+        setBuildForm(data.build);
+        setHasSavedBuild(true);
+        setEditingBuild(false);
+        saveJSON(BUILD_KEY, data.build);
+      }
+
+      if (data.updatedOn && data.trackedRank) {
+        setCheckins((prevCheckins) => {
+          if (prevCheckins.some((c) => c.date === data.updatedOn)) return prevCheckins;
+          const next = prevCheckins
+            .concat([{ date: data.updatedOn, rank: data.trackedRank, total: data.totalPlayers || null, note: "Auto-synced from akasha.cv" }])
+            .sort((a, b) => (a.date < b.date ? -1 : 1));
+          saveJSON(CHECKINS_KEY, next);
+          return next;
+        });
+      }
+
+      setAutoSync({ updatedOn: data.updatedOn, fetchedAt: data.fetchedAt, totalPlayers: data.totalPlayers });
+
+      // the workflow also captures a real screenshot of the build page —
+      // point at it directly rather than fetching+converting, and let the
+      // <img>'s onError handle the case where it doesn't exist yet (e.g.
+      // the screenshot step hasn't run successfully even once yet)
+      setBuildImage(`./data/build-screenshot.png?t=${encodeURIComponent(data.fetchedAt || data.updatedOn || Date.now())}`);
+    } catch (e) {
+      if (isManual) setSyncError("Couldn't reach data/leaderboard.json — check it's deployed at that path.");
+    } finally {
+      if (isManual) setSyncing(false);
+    }
+  };
 
   useEffect(() => {
     // Optional: if this app is hosted alongside data/leaderboard.json (see the
@@ -232,60 +298,7 @@ function RankTracker() {
     // it as the current build/top20/check-in data. If the file doesn't exist —
     // e.g. running locally, or the Action hasn't run yet — this just silently
     // does nothing and the app keeps whatever's already loaded.
-    (async () => {
-      try {
-        const res = await fetch("./data/leaderboard.json", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = await res.json();
-
-        if (data.top20 && Array.isArray(data.top20.rows) && data.top20.rows.length > 0) {
-          setTop20((prevTop20) => {
-            if (prevTop20.updatedOn && prevTop20.updatedOn !== data.top20.updatedOn) {
-              setTop20History((prevHist) => {
-                if (prevHist.some((h) => h.updatedOn === prevTop20.updatedOn)) return prevHist;
-                const merged = prevHist.concat([prevTop20]).sort((a, b) => (a.updatedOn < b.updatedOn ? 1 : -1));
-                saveJSON(TOP20_HISTORY_KEY, merged);
-                return merged;
-              });
-            }
-            saveJSON(TOP20_KEY, data.top20);
-            return data.top20;
-          });
-          setTop20Form(data.top20);
-          setHasSavedTop20(true);
-          setEditingTop20(false);
-        }
-
-        if (data.build) {
-          setBuild(data.build);
-          setBuildForm(data.build);
-          setHasSavedBuild(true);
-          setEditingBuild(false);
-          saveJSON(BUILD_KEY, data.build);
-        }
-
-        if (data.updatedOn && data.trackedRank) {
-          setCheckins((prevCheckins) => {
-            if (prevCheckins.some((c) => c.date === data.updatedOn)) return prevCheckins;
-            const next = prevCheckins
-              .concat([{ date: data.updatedOn, rank: data.trackedRank, total: data.totalPlayers || null, note: "Auto-synced from akasha.cv" }])
-              .sort((a, b) => (a.date < b.date ? -1 : 1));
-            saveJSON(CHECKINS_KEY, next);
-            return next;
-          });
-        }
-
-        setAutoSync({ updatedOn: data.updatedOn, fetchedAt: data.fetchedAt, totalPlayers: data.totalPlayers });
-
-        // the workflow also captures a real screenshot of the build page —
-        // point at it directly rather than fetching+converting, and let the
-        // <img>'s onError handle the case where it doesn't exist yet (e.g.
-        // the screenshot step hasn't run successfully even once yet)
-        setBuildImage(`./data/build-screenshot.png?t=${encodeURIComponent(data.fetchedAt || data.updatedOn || Date.now())}`);
-      } catch (e) {
-        // data/leaderboard.json isn't available — nothing to do, app works as-is
-      }
-    })();
+    syncFromDataFile(false);
   }, []);
 
   const persistCheckins = (next) => {
@@ -491,7 +504,7 @@ function RankTracker() {
           </div>
         )}
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <div style={styles.siteStrip}>
             <span style={styles.siteStripDot} />
             akasha.cv · Genshin Leaderboards
@@ -501,7 +514,12 @@ function RankTracker() {
               <Icon.bolt size={11} /> Auto-synced {fmtLong(autoSync.updatedOn)}
             </div>
           )}
+          <button onClick={() => syncFromDataFile(true)} disabled={syncing} style={styles.syncBtn}>
+            {syncing ? <Icon.spinner size={12} /> : <Icon.upload size={12} style={{ transform: "rotate(180deg)" }} />}
+            {syncing ? "Syncing…" : "Sync now"}
+          </button>
         </div>
+        {syncError && <div style={styles.errText}>{syncError}</div>}
 
         <div style={styles.header}>
           <div>
@@ -966,6 +984,11 @@ const styles = {
     display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#c9b6ff",
     background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.4)",
     borderRadius: 999, padding: "5px 12px", width: "fit-content",
+  },
+  syncBtn: {
+    display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#9a90b8",
+    background: "#181330", border: "1px solid #2a2246", borderRadius: 999,
+    padding: "5px 12px", cursor: "pointer", fontFamily: "'Inter',sans-serif",
   },
   header: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 },
   eyebrow: {
