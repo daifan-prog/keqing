@@ -1,14 +1,23 @@
 // Fetches the Keqing (Mistsplitter Reforged, 4p TF) leaderboard from akasha.cv's
 // own JSON API and writes the top 20 + GH's build stats + total player count
 // to data/leaderboard.json. Runs daily via GitHub Actions (see
-// .github/workflows/update-leaderboard.yml) — this is server-side, so it isn't
-// subject to browser CORS restrictions the way the app itself would be.
+// .github/workflows/update-leaderboard.yml).
+//
+// This uses a real Playwright browser (not a bare Node fetch) to make the API
+// calls FROM WITHIN an actual page context. A plain server-side fetch from
+// GitHub's runner IPs gets blocked with a 403 by akasha.cv's bot protection —
+// routing the request through a real browser session (same technique the
+// screenshot script already uses) gets past that.
+
+import { chromium } from "playwright";
+import fs from "node:fs/promises";
 
 const CALCULATION_ID = "1000004200";
 const VARIANT = "tf";
 const TRACKED_UID = "602489073"; // GH
 
-const LEADERBOARD_URL =
+const LEADERBOARD_PAGE_URL = `https://akasha.cv/leaderboards/${CALCULATION_ID}/${VARIANT}`;
+const LEADERBOARD_API_URL =
   `https://akasha.cv/api/leaderboards?sort=calculation.result&order=-1&size=20&page=1` +
   `&filter=&uids=&p=&fromId=&li=&variant=${VARIANT}&calculationId=${CALCULATION_ID}`;
 
@@ -29,21 +38,39 @@ function primaryArtifactSet(artifactSets) {
 }
 
 async function main() {
-  const res = await fetch(LEADERBOARD_URL);
-  if (!res.ok) throw new Error(`Leaderboard fetch failed: ${res.status}`);
-  const json = await res.json();
+  console.log("Launching browser…");
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+
+  console.log("Establishing a real browser session on akasha.cv…");
+  await page.goto(LEADERBOARD_PAGE_URL, { waitUntil: "domcontentloaded", timeout: 45000 });
+
+  console.log("Fetching leaderboard API from within the browser context…");
+  const json = await page.evaluate(async (url) => {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Leaderboard fetch failed: ${res.status}`);
+    return res.json();
+  }, LEADERBOARD_API_URL);
+
   const rows = json.data || [];
+  console.log(`Got ${rows.length} rows.`);
 
   let totalPlayers = null;
   if (json.totalRowsHash) {
-    const sizeRes = await fetch(
-      `https://akasha.cv/api/getCollectionSize/?variant=charactersLb&hash=${json.totalRowsHash}`
-    );
-    if (sizeRes.ok) {
-      const sizeJson = await sizeRes.json();
-      totalPlayers = sizeJson.totalRows ?? null;
+    console.log("Fetching total player count…");
+    try {
+      const sizeJson = await page.evaluate(async (hash) => {
+        const res = await fetch(`https://akasha.cv/api/getCollectionSize/?variant=charactersLb&hash=${hash}`);
+        if (!res.ok) throw new Error(`getCollectionSize failed: ${res.status}`);
+        return res.json();
+      }, json.totalRowsHash);
+      totalPlayers = sizeJson?.totalRows ?? null;
+    } catch (err) {
+      console.error("Couldn't fetch total player count (non-fatal):", err.message);
     }
   }
+
+  await browser.close();
 
   const top20Rows = rows.slice(0, 20).map((entry, i) => ({
     rank: i + 1,
@@ -80,13 +107,12 @@ async function main() {
     top20: { updatedOn: today, rows: top20Rows },
   };
 
-  const fs = await import("node:fs/promises");
   await fs.mkdir("data", { recursive: true });
   await fs.writeFile("data/leaderboard.json", JSON.stringify(output, null, 2) + "\n");
   console.log("Wrote data/leaderboard.json:", JSON.stringify(output, null, 2));
 }
 
 main().catch((err) => {
-  console.error(err);
+  console.error("update-leaderboard.mjs failed:", err);
   process.exit(1);
 });
