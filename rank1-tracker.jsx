@@ -1,49 +1,20 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Rank 1 Watch</title>
-<meta name="theme-color" content="#0e0b1f" />
-<meta name="description" content="Tracks GH's Rank 1 streak on the Keqing leaderboard on akasha.cv" />
-<link rel="manifest" href="manifest.json" />
-<link rel="icon" href="icon.svg" type="image/svg+xml" />
-<link rel="apple-touch-icon" href="icon.svg" />
-<style>
-  html, body { margin: 0; padding: 0; background: #0e0b1f; min-height: 100vh; }
-  #root { min-height: 100vh; }
-</style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.4/babel.min.js" crossorigin></script>
-</head>
-<body>
-<div id="root"><div id="loading-hint" style="color:#9a90b8;font-family:sans-serif;padding:24px;">Loading…</div></div>
-<script>
-  setTimeout(function () {
-    var hint = document.getElementById("loading-hint");
-    if (!hint) return; // app already rendered and replaced this
-    var missing = [];
-    if (typeof React === "undefined") missing.push("React");
-    if (typeof ReactDOM === "undefined") missing.push("ReactDOM");
-    if (typeof Babel === "undefined") missing.push("Babel");
-    hint.textContent = missing.length
-      ? "Couldn't load: " + missing.join(", ") + ". Your network may be blocking cdnjs.cloudflare.com — try a different network or check your browser's ad/script blocker."
-      : "Scripts loaded, but the app didn't start. Open the browser console for the error.";
-  }, 4000);
-</script>
-<script type="text/babel" data-presets="react">
-const { useState, useEffect, useMemo } = React;
+import React, { useState, useEffect, useMemo } from "react";
 
 // ============================================================
-// Rank 1 Watch — standalone web app version.
-// Tracks GH's #1 run on the Keqing (Mistsplitter Reforged R1)
-// leaderboard on akasha.cv, anchored Feb 2, 2026.
+// Rank 1 Watch — tracks GH's #1 run on the Keqing (Mistsplitter
+// Reforged R5) leaderboard on akasha.cv, anchored Feb 2, 2026.
 //
-// Same design and logic as the Claude.ai artifact version, with
-// one change: persistence uses the browser's own localStorage
-// instead of Claude's window.storage API, since this runs
-// standalone in any browser.
+// Rebuilt with two deliberate choices vs earlier versions:
+// 1. No external libraries (no recharts, no lucide-react) — the
+//    chart and every icon here are hand-drawn SVG, so a failed
+//    or slow-loading third-party bundle can't be why the app
+//    gets stuck. This is intentionally dependency-free.
+// 2. The UI never waits on storage to render. It shows
+//    immediately using in-memory defaults, then tries to load
+//    saved data in the background and swaps it in if that
+//    succeeds. If storage never responds, you still have a
+//    working app — you just start from the defaults instead of
+//    your saved history.
 // ============================================================
 
 const DAY = 86400000;
@@ -104,19 +75,30 @@ const BUILD_FIELDS = [
   { key: "avgDmg", label: "Avg DMG (leaderboard)", placeholder: "48920", numeric: true },
 ];
 
-function loadJSON(key, fallback) {
+// storage calls get a short leash — if one hangs, we move on instead
+// of freezing the app waiting for it
+function withTimeout(promise, ms = 4000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("timed out")), ms)),
+  ]);
+}
+
+async function loadJSON(key, fallback) {
   try {
-    const raw = localStorage.getItem(key);
-    if (raw === null) return fallback;
-    return JSON.parse(raw);
+    if (!window.storage) return fallback;
+    const res = await withTimeout(window.storage.get(key, false));
+    if (res && res.value) return JSON.parse(res.value);
+    return fallback;
   } catch (e) {
     return fallback;
   }
 }
 
-function saveJSON(key, value) {
+async function saveJSON(key, value) {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    if (!window.storage) return false;
+    await withTimeout(window.storage.set(key, JSON.stringify(value), false));
     return true;
   } catch (e) {
     return false;
@@ -167,7 +149,8 @@ const Icon = {
   ),
 };
 
-function RankTracker() {
+export default function RankTracker() {
+  // ----- check-in log (in-memory first, storage enhances) -----
   const [checkins, setCheckins] = useState(SEED_CHECKINS);
   const [storageReady, setStorageReady] = useState(false);
   const [rankInput, setRankInput] = useState("1");
@@ -176,6 +159,7 @@ function RankTracker() {
   const [noteInput, setNoteInput] = useState("");
   const [err, setErr] = useState("");
 
+  // ----- build panel -----
   const [build, setBuild] = useState(SEED_BUILD);
   const [editingBuild, setEditingBuild] = useState(false);
   const [buildForm, setBuildForm] = useState(SEED_BUILD);
@@ -185,6 +169,7 @@ function RankTracker() {
   const [imageErr, setImageErr] = useState("");
   const [imageModalOpen, setImageModalOpen] = useState(false);
 
+  // ----- tabs + top 20 leaderboard snapshot -----
   const [activeTab, setActiveTab] = useState("tracker");
   const [top20, setTop20] = useState(SEED_TOP20);
   const [top20Form, setTop20Form] = useState(SEED_TOP20);
@@ -194,120 +179,51 @@ function RankTracker() {
   const [expandedHistoryDate, setExpandedHistoryDate] = useState(null);
 
   useEffect(() => {
-    const savedCheckins = loadJSON(CHECKINS_KEY, null);
-    const savedBuild = loadJSON(BUILD_KEY, null);
-    const savedTop20 = loadJSON(TOP20_KEY, null);
-    const savedTop20History = loadJSON(TOP20_HISTORY_KEY, null);
-    let savedImage = null;
-    try {
-      savedImage = localStorage.getItem(BUILD_IMAGE_KEY);
-    } catch (e) {
-      // no screenshot saved, that's fine
-    }
-    if (Array.isArray(savedCheckins) && savedCheckins.length > 0) setCheckins(savedCheckins);
-    if (savedBuild) {
-      setBuild(savedBuild);
-      setBuildForm(savedBuild);
-      setHasSavedBuild(true);
-      setEditingBuild(false);
-    }
-    if (savedTop20 && Array.isArray(savedTop20.rows) && savedTop20.rows.length > 0) {
-      setTop20(savedTop20);
-      setTop20Form(savedTop20);
-      setHasSavedTop20(true);
-      setEditingTop20(false);
-    }
-    if (Array.isArray(savedTop20History) && savedTop20History.length > 0) {
-      setTop20History(savedTop20History);
-    }
-    if (savedImage) setBuildImage(savedImage);
-    setStorageReady(true);
-  }, []);
-
-  const [autoSync, setAutoSync] = useState(null); // { updatedOn, fetchedAt, totalPlayers } once a successful sync happens
-  const [syncing, setSyncing] = useState(false);
-  const [syncError, setSyncError] = useState("");
-
-  const syncFromDataFile = async (isManual) => {
-    if (isManual) {
-      setSyncing(true);
-      setSyncError("");
-    }
-    try {
-      const res = await fetch("./data/leaderboard.json", { cache: "no-store" });
-      if (!res.ok) {
-        if (isManual) setSyncError("No synced data found yet — trigger the GitHub Action first, then try again.");
-        return;
+    let cancelled = false;
+    (async () => {
+      const savedCheckins = await loadJSON(CHECKINS_KEY, null);
+      const savedBuild = await loadJSON(BUILD_KEY, null);
+      const savedTop20 = await loadJSON(TOP20_KEY, null);
+      const savedTop20History = await loadJSON(TOP20_HISTORY_KEY, null);
+      let savedImage = null;
+      try {
+        if (window.storage) {
+          const res = await withTimeout(window.storage.get(BUILD_IMAGE_KEY, false));
+          if (res && res.value) savedImage = res.value;
+        }
+      } catch (e) {
+        // no screenshot saved, that's fine
       }
-      const data = await res.json();
-
-      if (data.top20 && Array.isArray(data.top20.rows) && data.top20.rows.length > 0) {
-        setTop20((prevTop20) => {
-          if (prevTop20.updatedOn && prevTop20.updatedOn !== data.top20.updatedOn) {
-            setTop20History((prevHist) => {
-              if (prevHist.some((h) => h.updatedOn === prevTop20.updatedOn)) return prevHist;
-              const merged = prevHist.concat([prevTop20]).sort((a, b) => (a.updatedOn < b.updatedOn ? 1 : -1));
-              saveJSON(TOP20_HISTORY_KEY, merged);
-              return merged;
-            });
-          }
-          saveJSON(TOP20_KEY, data.top20);
-          return data.top20;
-        });
-        setTop20Form(data.top20);
+      if (cancelled) return;
+      if (Array.isArray(savedCheckins) && savedCheckins.length > 0) setCheckins(savedCheckins);
+      if (savedBuild) {
+        setBuild(savedBuild);
+        setBuildForm(savedBuild);
+        setHasSavedBuild(true);
+        setEditingBuild(false);
+      }
+      if (savedTop20 && Array.isArray(savedTop20.rows) && savedTop20.rows.length > 0) {
+        setTop20(savedTop20);
+        setTop20Form(savedTop20);
         setHasSavedTop20(true);
         setEditingTop20(false);
       }
-
-      if (data.build) {
-        setBuild(data.build);
-        setBuildForm(data.build);
-        setHasSavedBuild(true);
-        setEditingBuild(false);
-        saveJSON(BUILD_KEY, data.build);
+      if (Array.isArray(savedTop20History) && savedTop20History.length > 0) {
+        setTop20History(savedTop20History);
       }
-
-      if (data.updatedOn && data.trackedRank) {
-        setCheckins((prevCheckins) => {
-          if (prevCheckins.some((c) => c.date === data.updatedOn)) return prevCheckins;
-          const next = prevCheckins
-            .concat([{ date: data.updatedOn, rank: data.trackedRank, total: data.totalPlayers || null, note: "Auto-synced from akasha.cv" }])
-            .sort((a, b) => (a.date < b.date ? -1 : 1));
-          saveJSON(CHECKINS_KEY, next);
-          return next;
-        });
-      }
-
-      setAutoSync({ updatedOn: data.updatedOn, fetchedAt: data.fetchedAt, totalPlayers: data.totalPlayers });
-
-      // the workflow also captures a real screenshot of the build page —
-      // point at it directly rather than fetching+converting, and let the
-      // <img>'s onError handle the case where it doesn't exist yet (e.g.
-      // the screenshot step hasn't run successfully even once yet)
-      setBuildImage(`./data/build-screenshot.png?t=${encodeURIComponent(data.fetchedAt || data.updatedOn || Date.now())}`);
-    } catch (e) {
-      if (isManual) setSyncError("Couldn't reach data/leaderboard.json — check it's deployed at that path.");
-    } finally {
-      if (isManual) setSyncing(false);
-    }
-  };
-
-  useEffect(() => {
-    // Optional: if this app is hosted alongside data/leaderboard.json (see the
-    // GitHub Actions workflow in this bundle), pull it in automatically and use
-    // it as the current build/top20/check-in data. If the file doesn't exist —
-    // e.g. running locally, or the Action hasn't run yet — this just silently
-    // does nothing and the app keeps whatever's already loaded.
-    syncFromDataFile(false);
+      if (savedImage) setBuildImage(savedImage);
+      setStorageReady(true);
+    })();
+    return () => { cancelled = true; };
   }, []);
 
-  const persistCheckins = (next) => {
+  const persistCheckins = async (next) => {
     setCheckins(next);
-    const ok = saveJSON(CHECKINS_KEY, next);
-    if (!ok) setErr("Saved for this session only — this browser's storage might be full or blocked.");
+    const ok = await saveJSON(CHECKINS_KEY, next);
+    if (!ok) setErr("Saved for this session only — couldn't reach persistent storage.");
   };
 
-  const saveBuild = () => {
+  const saveBuild = async () => {
     const cleaned = {};
     BUILD_FIELDS.forEach(({ key, numeric }) => {
       const raw = (buildForm[key] ?? "").toString().trim();
@@ -317,8 +233,8 @@ function RankTracker() {
     setBuildForm(cleaned);
     setHasSavedBuild(true);
     setEditingBuild(false);
-    const ok = saveJSON(BUILD_KEY, cleaned);
-    if (!ok) setErr("Build saved for this session only — this browser's storage might be full or blocked.");
+    const ok = await saveJSON(BUILD_KEY, cleaned);
+    if (!ok) setErr("Build saved for this session only — couldn't reach persistent storage.");
   };
 
   const updateTop20Row = (index, field, value) => {
@@ -327,7 +243,7 @@ function RankTracker() {
     setTop20Form({ ...top20Form, rows });
   };
 
-  const saveTop20 = () => {
+  const saveTop20 = async () => {
     const cleaned = {
       updatedOn: todayIso(),
       rows: top20Form.rows.map((r) => ({
@@ -341,29 +257,29 @@ function RankTracker() {
     setTop20Form(cleaned);
     setHasSavedTop20(true);
     setEditingTop20(false);
-    const ok = saveJSON(TOP20_KEY, cleaned);
-    if (!ok) setErr("Top 20 saved for this session only — this browser's storage might be full or blocked.");
+    const ok = await saveJSON(TOP20_KEY, cleaned);
+    if (!ok) setErr("Top 20 saved for this session only — couldn't reach persistent storage.");
 
     const nextHistory = top20History
       .filter((h) => h.updatedOn !== cleaned.updatedOn)
       .concat([cleaned])
       .sort((a, b) => (a.updatedOn < b.updatedOn ? 1 : -1));
     setTop20History(nextHistory);
-    saveJSON(TOP20_HISTORY_KEY, nextHistory);
+    await saveJSON(TOP20_HISTORY_KEY, nextHistory);
   };
 
   const handleImageUpload = (file) => {
     setImageErr("");
     setImageLoading(true);
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       const dataUrl = reader.result;
       setBuildImage(dataUrl);
       setImageLoading(false);
       try {
-        localStorage.setItem(BUILD_IMAGE_KEY, dataUrl);
+        if (window.storage) await withTimeout(window.storage.set(BUILD_IMAGE_KEY, dataUrl, false));
       } catch (e) {
-        setImageErr("Screenshot shown, but it's too large to save to this browser's storage.");
+        setImageErr("Screenshot shown, but it's too large to save — it'll disappear on reload.");
       }
     };
     reader.onerror = () => {
@@ -373,16 +289,16 @@ function RankTracker() {
     reader.readAsDataURL(file);
   };
 
-  const removeBuildImage = () => {
+  const removeBuildImage = async () => {
     setBuildImage(null);
     try {
-      localStorage.removeItem(BUILD_IMAGE_KEY);
+      if (window.storage) await withTimeout(window.storage.delete(BUILD_IMAGE_KEY, false));
     } catch (e) {
       // already cleared from view either way
     }
   };
 
-  const submit = () => {
+  const submit = async () => {
     setErr("");
     const rank = parseInt(rankInput, 10);
     if (!dateInput) return setErr("Pick a date.");
@@ -391,12 +307,12 @@ function RankTracker() {
     const total = totalInput.trim() ? parseInt(totalInput, 10) : null;
     if (totalInput.trim() && (!total || total < rank)) return setErr("Total players must be a number ≥ rank.");
     const next = checkins.filter((c) => c.date !== dateInput).concat([{ date: dateInput, rank, total, note: noteInput.trim() }]);
-    persistCheckins(next.sort((a, b) => (a.date < b.date ? -1 : 1)));
+    await persistCheckins(next.sort((a, b) => (a.date < b.date ? -1 : 1)));
     setNoteInput("");
     setTotalInput("");
   };
 
-  const remove = (date) => {
+  const remove = async (date) => {
     const sortedNow = checkins.slice().sort((a, b) => (a.date < b.date ? -1 : 1));
     if (sortedNow.length <= 1) {
       window.alert("You need at least one check-in — this is your only one, so it can't be deleted. Log a new one first if you want to replace it.");
@@ -405,7 +321,7 @@ function RankTracker() {
     if (date === sortedNow[0]?.date) {
       if (!window.confirm("This is your earliest logged check-in — removing it changes your all-time anchor date. Continue?")) return;
     }
-    persistCheckins(checkins.filter((c) => c.date !== date));
+    await persistCheckins(checkins.filter((c) => c.date !== date));
   };
 
   const sorted = useMemo(() => {
@@ -501,26 +417,14 @@ function RankTracker() {
       <div style={styles.container}>
         {!storageReady && (
           <div style={styles.syncBanner}>
-            <Icon.spinner size={12} /> Loading saved data…
+            <Icon.spinner size={12} /> Syncing with saved data… (showing defaults meanwhile)
           </div>
         )}
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <div style={styles.siteStrip}>
-            <span style={styles.siteStripDot} />
-            akasha.cv · Genshin Leaderboards
-          </div>
-          {autoSync && (
-            <div style={styles.autoSyncBadge}>
-              <Icon.bolt size={11} /> Auto-synced {fmtLong(autoSync.updatedOn)}
-            </div>
-          )}
-          <button onClick={() => syncFromDataFile(true)} disabled={syncing} style={styles.syncBtn}>
-            {syncing ? <Icon.spinner size={12} /> : <Icon.upload size={12} style={{ transform: "rotate(180deg)" }} />}
-            {syncing ? "Syncing…" : "Sync now"}
-          </button>
+        <div style={styles.siteStrip}>
+          <span style={styles.siteStripDot} />
+          akasha.cv · Genshin Leaderboards
         </div>
-        {syncError && <div style={styles.errText}>{syncError}</div>}
 
         <div style={styles.header}>
           <div>
@@ -542,16 +446,23 @@ function RankTracker() {
         </div>
 
         <div style={styles.tabBar}>
-          <button onClick={() => setActiveTab("tracker")} style={styles.tabBtn(activeTab === "tracker")}>
+          <button
+            onClick={() => setActiveTab("tracker")}
+            style={styles.tabBtn(activeTab === "tracker")}
+          >
             My tracker
           </button>
-          <button onClick={() => setActiveTab("top20")} style={styles.tabBtn(activeTab === "top20")}>
+          <button
+            onClick={() => setActiveTab("top20")}
+            style={styles.tabBtn(activeTab === "top20")}
+          >
             Top 20
           </button>
         </div>
 
         {activeTab === "tracker" && (
         <>
+        {/* build panel */}
         <div style={styles.panel}>
           <div style={styles.buildHeader}>
             <div style={styles.panelTitle}>My build</div>
@@ -575,12 +486,7 @@ function RankTracker() {
                   style={styles.screenshotBtn}
                   aria-label="View full-size screenshot"
                 >
-                  <img
-                    src={buildImage}
-                    alt="Keqing build screenshot"
-                    style={styles.screenshotImg}
-                    onError={() => setBuildImage(null)}
-                  />
+                  <img src={buildImage} alt="Uploaded Keqing build screenshot" style={styles.screenshotImg} />
                   <div style={styles.screenshotHint}>Click to view full size</div>
                 </button>
                 <div style={styles.screenshotActions}>
@@ -661,6 +567,7 @@ function RankTracker() {
           )}
         </div>
 
+        {/* streak ring + stats */}
         <div style={styles.heroGrid}>
           <div style={styles.ringCard}>
             <svg width="140" height="140" viewBox="0 0 140 140">
@@ -698,11 +605,13 @@ function RankTracker() {
           </div>
         </div>
 
+        {/* hand-drawn rank history chart, no chart library */}
         <div style={styles.panel}>
           <div style={styles.panelTitle}>Rank history</div>
           <RankChart points={stats.chartPoints} maxRank={stats.maxRank} />
         </div>
 
+        {/* check-in form */}
         <div style={styles.panel}>
           <div style={styles.panelTitle}>Log a check-in</div>
           <div style={styles.form}>
@@ -715,6 +624,7 @@ function RankTracker() {
           {err && <div style={styles.errText}>{err}</div>}
         </div>
 
+        {/* history */}
         <div style={styles.panel}>
           <div style={styles.panelTitle}>Check-in log</div>
           <div>
@@ -969,7 +879,7 @@ const styles = {
     background: `linear-gradient(180deg,#0e0b1f 0%,#120e24 100%), url("${DIAMOND_PATTERN}")`,
     backgroundBlendMode: "normal, soft-light",
     backgroundSize: "auto, 84px 84px",
-    minHeight: "100vh", padding: "28px 16px", fontFamily: "'Inter',sans-serif",
+    minHeight: "100%", padding: "28px 16px", fontFamily: "'Inter',sans-serif",
   },
   container: { maxWidth: 720, margin: "0 auto", display: "flex", flexDirection: "column", gap: 18 },
   syncBanner: {
@@ -982,16 +892,6 @@ const styles = {
     border: "1px solid rgba(57,91,100,0.5)", borderRadius: 999, padding: "5px 12px", width: "fit-content",
   },
   siteStripDot: { width: 6, height: 6, borderRadius: "50%", background: "#5dcaa5", display: "inline-block" },
-  autoSyncBadge: {
-    display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#c9b6ff",
-    background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.4)",
-    borderRadius: 999, padding: "5px 12px", width: "fit-content",
-  },
-  syncBtn: {
-    display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#9a90b8",
-    background: "#181330", border: "1px solid #2a2246", borderRadius: 999,
-    padding: "5px 12px", cursor: "pointer", fontFamily: "'Inter',sans-serif",
-  },
   header: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 },
   eyebrow: {
     display: "flex", alignItems: "center", gap: 6,
@@ -1137,17 +1037,3 @@ const styles = {
   },
   historyDateSub: { color: "#9a90b8", fontSize: 11.5, fontFamily: "'Inter',sans-serif" },
 };
-
-ReactDOM.createRoot(document.getElementById("root")).render(<RankTracker />);
-</script>
-<script>
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("sw.js").catch(() => {
-        // offline/install support just won't be available — the app still works
-      });
-    });
-  }
-</script>
-</body>
-</html>
