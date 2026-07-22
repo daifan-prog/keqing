@@ -172,52 +172,65 @@ function cardHtml({ weapon, artifactSet, critRate, critDmg, atk, dmgBonus, avgDm
 }
 
 async function captureFallbackCard(page) {
-  console.log("Falling back: fetching stats via the leaderboard API and rendering our own card…");
-  await page.goto(LEADERBOARD_PAGE_URL, { waitUntil: "domcontentloaded", timeout: 45000 });
-
-  const json = await page.evaluate(async (url) => {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Leaderboard fetch failed: ${res.status}`);
-    return res.json();
-  }, LEADERBOARD_API_URL);
-
-  const rows = json.data || [];
-  let totalPlayers = null;
-  if (json.totalRowsHash) {
+  const FALLBACK_ATTEMPTS = 3;
+  for (let attempt = 1; attempt <= FALLBACK_ATTEMPTS; attempt++) {
     try {
-      const sizeJson = await page.evaluate(async (hash) => {
-        const res = await fetch(`https://akasha.cv/api/getCollectionSize/?variant=charactersLb&hash=${hash}`);
-        if (!res.ok) throw new Error(`getCollectionSize failed: ${res.status}`);
+      console.log(`Fallback attempt ${attempt}/${FALLBACK_ATTEMPTS}: fetching stats via the leaderboard API…`);
+      await page.goto(LEADERBOARD_PAGE_URL, { waitUntil: "domcontentloaded", timeout: 45000 });
+
+      const json = await page.evaluate(async (url) => {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Leaderboard fetch failed: ${res.status}`);
         return res.json();
-      }, json.totalRowsHash);
-      totalPlayers = sizeJson?.totalRows ?? null;
+      }, LEADERBOARD_API_URL);
+
+      const rows = json.data || [];
+      let totalPlayers = null;
+      if (json.totalRowsHash) {
+        try {
+          const sizeJson = await page.evaluate(async (hash) => {
+            const res = await fetch(`https://akasha.cv/api/getCollectionSize/?variant=charactersLb&hash=${hash}`);
+            if (!res.ok) throw new Error(`getCollectionSize failed: ${res.status}`);
+            return res.json();
+          }, json.totalRowsHash);
+          totalPlayers = sizeJson?.totalRows ?? null;
+        } catch (err) {
+          console.error("Couldn't fetch total player count (non-fatal):", err.message);
+        }
+      }
+
+      const trackedIndex = rows.findIndex((e) => e.uid === TRACKED_UID);
+      const trackedEntry = trackedIndex >= 0 ? rows[trackedIndex] : rows[0];
+      if (!trackedEntry) throw new Error("No leaderboard rows returned.");
+
+      const s = trackedEntry.stats || {};
+      const cardData = {
+        weapon: `${trackedEntry.weapon?.name || ""} ${refinementLabel(trackedEntry.weapon?.weaponInfo?.refinementLevel?.value)}`.trim(),
+        artifactSet: primaryArtifactSet(trackedEntry.artifactSets),
+        critRate: s.critRate ? (s.critRate.value * 100).toFixed(1) : "—",
+        critDmg: s.critDamage ? (s.critDamage.value * 100).toFixed(1) : "—",
+        atk: s.atk ? Math.round(s.atk.value) : 0,
+        dmgBonus: s.electroDamageBonus ? (s.electroDamageBonus.value * 100).toFixed(1) : "—",
+        avgDmg: trackedEntry.calculation?.result != null ? Math.round(trackedEntry.calculation.result) : 0,
+        cv: trackedEntry.critValue != null ? trackedEntry.critValue.toFixed(1) : "—",
+        rank: trackedIndex >= 0 ? trackedIndex + 1 : null,
+        total: totalPlayers,
+      };
+
+      await page.setContent(cardHtml(cardData), { waitUntil: "domcontentloaded" });
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: OUTPUT_PATH });
+      console.log(`Wrote ${OUTPUT_PATH} (fallback card, attempt ${attempt}).`);
+      return true;
     } catch (err) {
-      console.error("Couldn't fetch total player count (non-fatal):", err.message);
+      console.error(`Fallback attempt ${attempt} failed: ${err.message}`);
+      if (attempt < FALLBACK_ATTEMPTS) {
+        await page.waitForTimeout(4000 * attempt);
+      }
     }
   }
-
-  const trackedIndex = rows.findIndex((e) => e.uid === TRACKED_UID);
-  const trackedEntry = trackedIndex >= 0 ? rows[trackedIndex] : rows[0];
-  if (!trackedEntry) throw new Error("No leaderboard rows returned — can't build a fallback card without data.");
-
-  const s = trackedEntry.stats || {};
-  const cardData = {
-    weapon: `${trackedEntry.weapon?.name || ""} ${refinementLabel(trackedEntry.weapon?.weaponInfo?.refinementLevel?.value)}`.trim(),
-    artifactSet: primaryArtifactSet(trackedEntry.artifactSets),
-    critRate: s.critRate ? (s.critRate.value * 100).toFixed(1) : "—",
-    critDmg: s.critDamage ? (s.critDamage.value * 100).toFixed(1) : "—",
-    atk: s.atk ? Math.round(s.atk.value) : 0,
-    dmgBonus: s.electroDamageBonus ? (s.electroDamageBonus.value * 100).toFixed(1) : "—",
-    avgDmg: trackedEntry.calculation?.result != null ? Math.round(trackedEntry.calculation.result) : 0,
-    cv: trackedEntry.critValue != null ? trackedEntry.critValue.toFixed(1) : "—",
-    rank: trackedIndex >= 0 ? trackedIndex + 1 : null,
-    total: totalPlayers,
-  };
-
-  await page.setContent(cardHtml(cardData), { waitUntil: "domcontentloaded" });
-  await page.waitForTimeout(300);
-  await page.screenshot({ path: OUTPUT_PATH });
-  console.log(`Wrote ${OUTPUT_PATH} (fallback card).`);
+  console.error(`Fallback also failed after ${FALLBACK_ATTEMPTS} attempts.`);
+  return false;
 }
 
 async function main() {
@@ -234,14 +247,27 @@ async function main() {
   await fs.mkdir("data", { recursive: true });
 
   const gotRealCard = await tryCaptureRealCard(page);
+  let gotSomething = gotRealCard;
   if (!gotRealCard) {
-    await captureFallbackCard(page);
+    gotSomething = await captureFallbackCard(page);
   }
 
   await browser.close();
+
+  if (!gotSomething) {
+    // Both the real card and the fallback failed — almost certainly a
+    // transient issue on akasha.cv's end (their backend returning 503s /
+    // intermittent bot-protection false positives), not a bug in this
+    // script. Exit successfully without touching the existing
+    // data/build-screenshot.png, so yesterday's image stays in place rather
+    // than the whole workflow (and the leaderboard data step that already
+    // succeeded) getting marked as failed.
+    console.log("Couldn't get any screenshot this run — leaving the existing data/build-screenshot.png untouched.");
+    return;
+  }
 }
 
 main().catch((err) => {
-  console.error("Screenshot script failed:", err);
+  console.error("Screenshot script failed unexpectedly:", err);
   process.exit(1);
 });
