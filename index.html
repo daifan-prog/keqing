@@ -276,6 +276,12 @@ function RankTracker() {
         }
 
         setAutoSync({ updatedOn: data.updatedOn, fetchedAt: data.fetchedAt, totalPlayers: data.totalPlayers });
+
+        // the workflow also captures a real screenshot of the build page —
+        // point at it directly rather than fetching+converting, and let the
+        // <img>'s onError handle the case where it doesn't exist yet (e.g.
+        // the screenshot step hasn't run successfully even once yet)
+        setBuildImage(`./data/build-screenshot.png?t=${encodeURIComponent(data.fetchedAt || data.updatedOn || Date.now())}`);
       } catch (e) {
         // data/leaderboard.json isn't available — nothing to do, app works as-is
       }
@@ -550,7 +556,12 @@ function RankTracker() {
                   style={styles.screenshotBtn}
                   aria-label="View full-size screenshot"
                 >
-                  <img src={buildImage} alt="Uploaded Keqing build screenshot" style={styles.screenshotImg} />
+                  <img
+                    src={buildImage}
+                    alt="Keqing build screenshot"
+                    style={styles.screenshotImg}
+                    onError={() => setBuildImage(null)}
+                  />
                   <div style={styles.screenshotHint}>Click to view full size</div>
                 </button>
                 <div style={styles.screenshotActions}>

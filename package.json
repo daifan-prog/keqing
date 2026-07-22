@@ -1,0 +1,12 @@
+{
+  "name": "rank1-watch-automation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "update-data": "node scripts/update-leaderboard.mjs",
+    "update-screenshot": "node scripts/screenshot-build.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}
