@@ -39,8 +39,14 @@ function primaryArtifactSet(artifactSets) {
 
 async function main() {
   console.log("Launching browser…");
-  const browser = await chromium.launch();
-  const page = await browser.newPage();
+  const browser = await chromium.launch({
+    args: ["--disable-blink-features=AutomationControlled"],
+  });
+  const page = await browser.newPage({
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    viewport: { width: 1280, height: 900 },
+  });
 
   console.log("Establishing a real browser session on akasha.cv…");
   await page.goto(LEADERBOARD_PAGE_URL, { waitUntil: "domcontentloaded", timeout: 45000 });
