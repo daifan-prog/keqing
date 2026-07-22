@@ -1,7 +1,7 @@
 {
   "updatedOn": "2026-07-22",
-  "fetchedAt": "2026-07-22T22:36:22.137Z",
-  "totalPlayers": null,
+  "fetchedAt": "2026-07-22T00:00:00.000Z",
+  "totalPlayers": 162062,
   "trackedRank": 1,
   "build": {
     "weapon": "Mistsplitter Reforged R5",
@@ -15,126 +15,26 @@
   "top20": {
     "updatedOn": "2026-07-22",
     "rows": [
-      {
-        "rank": 1,
-        "nickname": "GH",
-        "avgDmg": 595809,
-        "cv": 281.4
-      },
-      {
-        "rank": 2,
-        "nickname": "沐悠甘青",
-        "avgDmg": 595049,
-        "cv": 268.2
-      },
-      {
-        "rank": 3,
-        "nickname": "ゼロ",
-        "avgDmg": 590236,
-        "cv": 263.5
-      },
-      {
-        "rank": 4,
-        "nickname": "kazoo",
-        "avgDmg": 586935,
-        "cv": 274.4
-      },
-      {
-        "rank": 5,
-        "nickname": "˚ʚ라임ɞ˚",
-        "avgDmg": 584660,
-        "cv": 267.4
-      },
-      {
-        "rank": 6,
-        "nickname": "まぐ",
-        "avgDmg": 584253,
-        "cv": 259.6
-      },
-      {
-        "rank": 7,
-        "nickname": "Cuwei",
-        "avgDmg": 583216,
-        "cv": 291.5
-      },
-      {
-        "rank": 8,
-        "nickname": "青空夜空",
-        "avgDmg": 583192,
-        "cv": 269.7
-      },
-      {
-        "rank": 9,
-        "nickname": "Tobit",
-        "avgDmg": 582193,
-        "cv": 260.5
-      },
-      {
-        "rank": 10,
-        "nickname": "HX386",
-        "avgDmg": 581868,
-        "cv": 267.4
-      },
-      {
-        "rank": 11,
-        "nickname": "Yuki",
-        "avgDmg": 581097,
-        "cv": 272.9
-      },
-      {
-        "rank": 12,
-        "nickname": "ベロ",
-        "avgDmg": 580805,
-        "cv": 265.1
-      },
-      {
-        "rank": 13,
-        "nickname": "take",
-        "avgDmg": 580498,
-        "cv": 277.5
-      },
-      {
-        "rank": 14,
-        "nickname": "紫色电电猫",
-        "avgDmg": 579782,
-        "cv": 282.1
-      },
-      {
-        "rank": 15,
-        "nickname": "Rena",
-        "avgDmg": 579469,
-        "cv": 283
-      },
-      {
-        "rank": 16,
-        "nickname": "Shinory",
-        "avgDmg": 578831,
-        "cv": 267.4
-      },
-      {
-        "rank": 17,
-        "nickname": "いであ",
-        "avgDmg": 577638,
-        "cv": 257.4
-      },
-      {
-        "rank": 18,
-        "nickname": "Firesnake",
-        "avgDmg": 577580,
-        "cv": 281.4
-      },
-      {
-        "rank": 19,
-        "nickname": "守到晴来",
-        "avgDmg": 577457,
-        "cv": 293
-      },
-      {
-        "rank": 20,
-        "nickname": "遥",
-        "avgDmg": 576518,
-        "cv": 279.8
-      }
+      { "rank": 1, "nickname": "GH", "avgDmg": 595809, "cv": 281.4 },
+      { "rank": 2, "nickname": "沐悠甘青", "avgDmg": 595049, "cv": 268.2 },
+      { "rank": 3, "nickname": "ゼロ", "avgDmg": 590236, "cv": 263.5 },
+      { "rank": 4, "nickname": "kazoo", "avgDmg": 586935, "cv": 274.4 },
+      { "rank": 5, "nickname": "˚ʚ라임ɞ˚", "avgDmg": 584660, "cv": 267.4 },
+      { "rank": 6, "nickname": "まぐ", "avgDmg": 584253, "cv": 259.6 },
+      { "rank": 7, "nickname": "Cuwei", "avgDmg": 583216, "cv": 291.5 },
+      { "rank": 8, "nickname": "青空夜空", "avgDmg": 583192, "cv": 269.7 },
+      { "rank": 9, "nickname": "Tobit", "avgDmg": 582193, "cv": 260.5 },
+      { "rank": 10, "nickname": "HX386", "avgDmg": 581868, "cv": 267.4 },
+      { "rank": 11, "nickname": "Yuki", "avgDmg": 581097, "cv": 272.9 },
+      { "rank": 12, "nickname": "ベロ", "avgDmg": 580805, "cv": 265.1 },
+      { "rank": 13, "nickname": "take", "avgDmg": 580498, "cv": 277.5 },
+      { "rank": 14, "nickname": "紫色电电猫", "avgDmg": 579782, "cv": 282.1 },
+      { "rank": 15, "nickname": "Rena", "avgDmg": 579469, "cv": 283.0 },
+      { "rank": 16, "nickname": "Shinory", "avgDmg": 578831, "cv": 267.4 },
+      { "rank": 17, "nickname": "いであ", "avgDmg": 577638, "cv": 257.4 },
+      { "rank": 18, "nickname": "Firesnake", "avgDmg": 577580, "cv": 281.4 },
+      { "rank": 19, "nickname": "守到晴来", "avgDmg": 577457, "cv": 293.0 },
+      { "rank": 20, "nickname": "遥", "avgDmg": 576518, "cv": 279.8 }
     ]
   }
 }
