@@ -87,6 +87,7 @@ const SEED_TOP20_HISTORY = [SEED_TOP20];
 const CHECKINS_KEY = "rank1:checkins";
 const BUILD_KEY = "rank1:build";
 const BUILD_IMAGE_KEY = "rank1:build-image";
+const IMAGE_TAB_KEY = "rank1:build-image-tab";
 const TOP20_KEY = "rank1:top20";
 const TOP20_HISTORY_KEY = "rank1:top20-history";
 
@@ -180,7 +181,9 @@ function RankTracker() {
   const [editingBuild, setEditingBuild] = useState(false);
   const [buildForm, setBuildForm] = useState(SEED_BUILD);
   const [hasSavedBuild, setHasSavedBuild] = useState(true);
-  const [buildImage, setBuildImage] = useState(null);
+  const [customImage, setCustomImage] = useState(null);
+  const [autoImage, setAutoImage] = useState(null);
+  const [imageTab, setImageTab] = useState("auto"); // "auto" | "custom"
   const [imageLoading, setImageLoading] = useState(false);
   const [imageErr, setImageErr] = useState("");
   const [imageModalOpen, setImageModalOpen] = useState(false);
@@ -204,6 +207,12 @@ function RankTracker() {
     } catch (e) {
       // no screenshot saved, that's fine
     }
+    let savedTab = null;
+    try {
+      savedTab = localStorage.getItem(IMAGE_TAB_KEY);
+    } catch (e) {
+      // no preference saved, that's fine
+    }
     if (Array.isArray(savedCheckins) && savedCheckins.length > 0) setCheckins(savedCheckins);
     if (savedBuild) {
       setBuild(savedBuild);
@@ -220,7 +229,8 @@ function RankTracker() {
     if (Array.isArray(savedTop20History) && savedTop20History.length > 0) {
       setTop20History(savedTop20History);
     }
-    if (savedImage) setBuildImage(savedImage);
+    if (savedImage) setCustomImage(savedImage);
+    if (savedTab === "auto" || savedTab === "custom") setImageTab(savedTab);
     setStorageReady(true);
   }, []);
 
@@ -280,11 +290,7 @@ function RankTracker() {
 
       setAutoSync({ updatedOn: data.updatedOn, fetchedAt: data.fetchedAt, totalPlayers: data.totalPlayers });
 
-      // the workflow also captures a real screenshot of the build page —
-      // point at it directly rather than fetching+converting, and let the
-      // <img>'s onError handle the case where it doesn't exist yet (e.g.
-      // the screenshot step hasn't run successfully even once yet)
-      setBuildImage(`./data/build-screenshot.png?t=${encodeURIComponent(data.fetchedAt || data.updatedOn || Date.now())}`);
+      setAutoImage(`./data/build-screenshot.png?t=${encodeURIComponent(data.fetchedAt || data.updatedOn || Date.now())}`);
     } catch (e) {
       if (isManual) setSyncError("Couldn't reach data/leaderboard.json — check it's deployed at that path.");
     } finally {
@@ -352,13 +358,23 @@ function RankTracker() {
     saveJSON(TOP20_HISTORY_KEY, nextHistory);
   };
 
+  const selectImageTab = (tab) => {
+    setImageTab(tab);
+    try {
+      localStorage.setItem(IMAGE_TAB_KEY, tab);
+    } catch (e) {
+      // non-fatal — just won't be remembered next visit
+    }
+  };
+
   const handleImageUpload = (file) => {
     setImageErr("");
     setImageLoading(true);
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result;
-      setBuildImage(dataUrl);
+      setCustomImage(dataUrl);
+      selectImageTab("custom");
       setImageLoading(false);
       try {
         localStorage.setItem(BUILD_IMAGE_KEY, dataUrl);
@@ -374,7 +390,7 @@ function RankTracker() {
   };
 
   const removeBuildImage = () => {
-    setBuildImage(null);
+    setCustomImage(null);
     try {
       localStorage.removeItem(BUILD_IMAGE_KEY);
     } catch (e) {
@@ -432,12 +448,15 @@ function RankTracker() {
         return sum + Math.max(0, e - s + 1);
       }, 0);
 
-    const yearStartIdx = toIdx("2026-01-01");
+    const currentYear = Number(today.slice(0, 4));
+    const isLeapYear = (currentYear % 4 === 0 && currentYear % 100 !== 0) || currentYear % 400 === 0;
+    const daysInYear = isLeapYear ? 366 : 365;
+    const yearStartIdx = toIdx(`${currentYear}-01-01`);
     const daysElapsedYTD = todayIdx - yearStartIdx + 1;
-    const daysLeftInYear = 365 - daysElapsedYTD;
+    const daysLeftInYear = daysInYear - daysElapsedYTD;
     const daysAtRank1YTD = overlapAtRank1(yearStartIdx, todayIdx);
     const ytdPercent = daysElapsedYTD > 0 ? (daysAtRank1YTD / daysElapsedYTD) * 100 : 0;
-    const yearPercent = (daysAtRank1YTD / 365) * 100;
+    const yearPercent = (daysAtRank1YTD / daysInYear) * 100;
 
     const totalDaysAtRank1 = overlapAtRank1(anchorIdx, todayIdx);
     const daysSinceAnchor = todayIdx - anchorIdx + 1;
@@ -468,7 +487,7 @@ function RankTracker() {
     }
     const percentile = lastKnownTotal ? (currentRank / lastKnownTotal) * 100 : null;
 
-    return { ytdPercent, yearPercent, daysAtRank1YTD, daysElapsedYTD, daysLeftInYear, totalDaysAtRank1, daysSinceAnchor, currentRank, currentStreak, chartPoints, maxRank, lastKnownTotal, percentile };
+    return { ytdPercent, yearPercent, daysAtRank1YTD, daysElapsedYTD, daysLeftInYear, daysInYear, currentYear, totalDaysAtRank1, daysSinceAnchor, currentRank, currentStreak, chartPoints, maxRank, lastKnownTotal, percentile };
   }, [sorted]);
 
   useEffect(() => {
@@ -568,19 +587,45 @@ function RankTracker() {
           </div>
 
           <div style={styles.screenshotBlock}>
-            {buildImage ? (
+            <div style={styles.imageTabBar}>
+              <button onClick={() => selectImageTab("auto")} style={styles.imageTabBtn(imageTab === "auto")}>
+                Auto (enka.network)
+              </button>
+              <button onClick={() => selectImageTab("custom")} style={styles.imageTabBtn(imageTab === "custom")}>
+                Custom
+              </button>
+            </div>
+
+            {imageTab === "auto" ? (
+              autoImage ? (
+                <div>
+                  <button
+                    onClick={() => setImageModalOpen(true)}
+                    style={styles.screenshotBtn}
+                    aria-label="View full-size screenshot"
+                  >
+                    <img
+                      src={autoImage}
+                      alt="Auto-synced Keqing build screenshot"
+                      style={styles.screenshotImg}
+                      onError={() => setAutoImage(null)}
+                    />
+                    <div style={styles.screenshotHint}>Click to view full size · synced from enka.network</div>
+                  </button>
+                </div>
+              ) : (
+                <div style={styles.autoImagePlaceholder}>
+                  No auto-synced image yet — it'll appear here after the next daily update, or switch to the Custom tab to upload your own in the meantime.
+                </div>
+              )
+            ) : customImage ? (
               <div>
                 <button
                   onClick={() => setImageModalOpen(true)}
                   style={styles.screenshotBtn}
                   aria-label="View full-size screenshot"
                 >
-                  <img
-                    src={buildImage}
-                    alt="Keqing build screenshot"
-                    style={styles.screenshotImg}
-                    onError={() => setBuildImage(null)}
-                  />
+                  <img src={customImage} alt="Custom Keqing build screenshot" style={styles.screenshotImg} />
                   <div style={styles.screenshotHint}>Click to view full size</div>
                 </button>
                 <div style={styles.screenshotActions}>
@@ -613,13 +658,13 @@ function RankTracker() {
             {imageErr && <div style={styles.errText}>{imageErr}</div>}
           </div>
 
-          {imageModalOpen && buildImage && (
+          {imageModalOpen && (imageTab === "auto" ? autoImage : customImage) && (
             <div style={styles.modalBackdrop} onClick={() => setImageModalOpen(false)}>
               <button style={styles.modalClose} onClick={() => setImageModalOpen(false)} aria-label="Close">
                 ✕
               </button>
               <img
-                src={buildImage}
+                src={imageTab === "auto" ? autoImage : customImage}
                 alt="Full-size Keqing build screenshot"
                 style={styles.modalImg}
                 onClick={(e) => e.stopPropagation()}
@@ -687,11 +732,11 @@ function RankTracker() {
           </div>
 
           <div style={styles.statsGrid}>
-            <StatCard label="YTD % at Rank 1" value={`${stats.ytdPercent.toFixed(2)}%`} sub={`${stats.daysAtRank1YTD} of ${stats.daysElapsedYTD} days elapsed in 2026`} />
-            <StatCard label="% of 2026 at Rank 1" value={`${stats.yearPercent.toFixed(2)}%`} sub={`${stats.daysAtRank1YTD} of 365 days — running total`} accent />
+            <StatCard label="YTD % at Rank 1" value={`${stats.ytdPercent.toFixed(2)}%`} sub={`${stats.daysAtRank1YTD} of ${stats.daysElapsedYTD} days elapsed in ${stats.currentYear}`} />
+            <StatCard label={`% of ${stats.currentYear} at Rank 1`} value={`${stats.yearPercent.toFixed(2)}%`} sub={`${stats.daysAtRank1YTD} of ${stats.daysInYear} days — running total`} accent />
             <StatCard label="Total days at Rank 1" value={stats.totalDaysAtRank1} sub="since first reaching #1" />
             <StatCard label="Days since Feb 2, 2026" value={stats.daysSinceAnchor} sub="anchor date tracked" />
-            <StatCard label="Days left in 2026" value={stats.daysLeftInYear} sub="remaining to keep the streak" />
+            <StatCard label={`Days left in ${stats.currentYear}`} value={stats.daysLeftInYear} sub="remaining to keep the streak" />
             {stats.percentile !== null && (
               <StatCard label="Percentile" value={`Top ${stats.percentile.toFixed(3)}%`} sub={`#${stats.currentRank} of ${stats.lastKnownTotal.toLocaleString()} players`} />
             )}
@@ -1034,6 +1079,18 @@ const styles = {
     padding: "8px 12px", cursor: "pointer", marginBottom: 12,
   },
   screenshotBlock: { marginBottom: 14 },
+  imageTabBar: { display: "flex", gap: 6, marginBottom: 10 },
+  imageTabBtn: (active) => ({
+    fontFamily: "'Inter',sans-serif", fontWeight: 600, fontSize: 11.5,
+    padding: "5px 12px", borderRadius: 999, cursor: "pointer",
+    background: active ? "linear-gradient(135deg,#8b5cf6,#6d4bc9)" : "#181330",
+    color: active ? "#f3f0fb" : "#9a90b8",
+    border: active ? "1px solid #8b5cf6" : "1px solid #2a2246",
+  }),
+  autoImagePlaceholder: {
+    fontSize: 12, color: "#9a90b8", lineHeight: 1.5, background: "#181330",
+    border: "1px dashed #2a2246", borderRadius: 8, padding: "12px 14px",
+  },
   screenshotBtn: {
     display: "block", padding: 0, margin: 0, background: "none", border: "none", cursor: "pointer",
     width: "100%", maxWidth: 560, textAlign: "left",
