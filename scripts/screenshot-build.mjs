@@ -1,122 +1,56 @@
-// Captures GH's real build-card image from akasha.cv (the same one behind
-// their own "Download"/"Open" buttons — canvas.bg-as-canvas) and saves it to
+// Captures GH's Keqing build-card image and saves it to
 // data/build-screenshot.png.
 //
-// akasha.cv's own backend is sometimes intermittently flaky (observed 503s on
-// some of its internal API calls even in normal interactive use) — when that
-// happens the page can render a "No data found" state instead of the build
-// card. Rather than treat that as fatal, this script detects it and retries
-// the page load a few times with backoff. Only if every retry still fails
-// does it fall back to generating a simpler card from the leaderboard API
-// data directly (which has proven reliable), so the pipeline never produces
-// nothing at all — but it always prefers the real akasha.cv card first.
+// Switched from akasha.cv to enka.network as the primary source: akasha.cv's
+// profile/build page consistently failed to load its character data at all
+// when run from GitHub Actions (100% failure rate across many runs, even
+// with retries) — enka.network is the underlying data source akasha.cv
+// itself pulls character icons from, and it's built specifically for heavy
+// third-party/bot consumption (many Discord bots and apps hit its API
+// constantly), so it doesn't have the same bot-protection issues. Its
+// showcase page also renders the card as a plain DOM element rather than a
+// canvas, which is simpler and more reliable to capture.
+//
+// If enka.network ever has its own issue, this still falls back to
+// rendering a simple card from the leaderboard stats already fetched by
+// update-leaderboard.mjs (read locally, no extra network calls, can't fail
+// from a network/bot-protection issue).
 
 import { chromium } from "playwright";
 import fs from "node:fs/promises";
 
-const BUILD_URL = "https://akasha.cv/profile/602489073?build=3522b7a268c3bb5c07a0d35bbda27828";
-const CARD_CANVAS_SELECTOR = "canvas.bg-as-canvas";
+const ENKA_URL = "https://enka.network/u/602489073/";
+const CHARACTER_NAME = "Keqing";
 const OUTPUT_PATH = "data/build-screenshot.png";
-const MAX_ATTEMPTS = 4;
+const LEADERBOARD_JSON_PATH = "data/leaderboard.json";
+const MAX_ATTEMPTS = 3;
 
-const CALCULATION_ID = "1000004200";
-const VARIANT = "tf";
-const TRACKED_UID = "602489073";
-const LEADERBOARD_PAGE_URL = `https://akasha.cv/leaderboards/${CALCULATION_ID}/${VARIANT}`;
-const LEADERBOARD_API_URL =
-  `https://akasha.cv/api/leaderboards?sort=calculation.result&order=-1&size=20&page=1` +
-  `&filter=&uids=&p=&fromId=&li=&variant=${VARIANT}&calculationId=${CALCULATION_ID}`;
-
-function refinementLabel(value) {
-  return `R${(value ?? 0) + 1}`;
-}
-
-function primaryArtifactSet(artifactSets) {
-  if (!artifactSets) return "";
-  const entries = Object.entries(artifactSets);
-  if (entries.length === 0) return "";
-  entries.sort((a, b) => (b[1].count || 0) - (a[1].count || 0));
-  const [name, info] = entries[0];
-  return `${name} (${info.count}pc)`;
-}
-
-async function waitForCanvasToSettle(page, selector, { checks = 6, intervalMs = 800, maxWaitMs = 20000 } = {}) {
-  const start = Date.now();
-  let lastSignature = null;
-  let stableCount = 0;
-
-  while (Date.now() - start < maxWaitMs) {
-    const signature = await page.evaluate((sel) => {
-      const canvas = document.querySelector(sel);
-      if (!canvas || canvas.width === 0 || canvas.height === 0) return null;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return null;
-      const w = canvas.width;
-      const h = canvas.height;
-      const points = [
-        [0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1],
-        [Math.floor(w / 2), Math.floor(h / 2)],
-        [Math.floor(w / 4), Math.floor(h / 4)],
-        [Math.floor((3 * w) / 4), Math.floor((3 * h) / 4)],
-      ];
-      let sig = "";
-      for (const [x, y] of points) {
-        try {
-          const data = ctx.getImageData(x, y, 1, 1).data;
-          sig += `${data[0]},${data[1]},${data[2]},${data[3]}|`;
-        } catch (e) {
-          return null;
-        }
-      }
-      return sig;
-    }, selector);
-
-    if (signature === null) {
-      await page.waitForTimeout(intervalMs);
-      continue;
-    }
-    if (signature === lastSignature) {
-      stableCount++;
-      if (stableCount >= checks) return true;
-    } else {
-      stableCount = 0;
-    }
-    lastSignature = signature;
-    await page.waitForTimeout(intervalMs);
-  }
-  return false;
-}
-
-async function tryCaptureRealCard(page) {
+async function tryCaptureEnkaCard(page) {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    console.log(`Attempt ${attempt}/${MAX_ATTEMPTS}: loading build page…`);
-    await page.goto(BUILD_URL, { waitUntil: "domcontentloaded", timeout: 45000 });
+    console.log(`Attempt ${attempt}/${MAX_ATTEMPTS}: loading enka.network showcase…`);
+    try {
+      await page.goto(ENKA_URL, { waitUntil: "domcontentloaded", timeout: 45000 });
+      await page.waitForSelector('[class*="Card"]', { timeout: 20000 });
+      await page.waitForTimeout(1500); // let icons/fonts finish settling
 
-    const hasRealData = await page
-      .evaluate(() => {
-        const bodyText = document.body.innerText || "";
-        if (bodyText.includes("No data found")) return false;
-        return !!document.querySelector("canvas.bg-as-canvas");
-      })
-      .catch(() => false);
+      const cardLocator = page.locator('[class*="Card"]').filter({ hasText: CHARACTER_NAME }).first();
+      const count = await page.locator('[class*="Card"]').filter({ hasText: CHARACTER_NAME }).count();
 
-    if (!hasRealData) {
-      console.log("Build data didn't load this attempt (got \"No data found\" or missing canvas) — retrying…");
-      await page.waitForTimeout(3000 * attempt); // back off a bit more each retry
-      continue;
+      if (count === 0) {
+        console.log(`No card found containing "${CHARACTER_NAME}" this attempt — retrying…`);
+        await page.waitForTimeout(3000 * attempt);
+        continue;
+      }
+
+      await cardLocator.screenshot({ path: OUTPUT_PATH });
+      console.log(`Wrote ${OUTPUT_PATH} from enka.network (attempt ${attempt}).`);
+      return true;
+    } catch (err) {
+      console.error(`Attempt ${attempt} failed: ${err.message}`);
+      if (attempt < MAX_ATTEMPTS) await page.waitForTimeout(3000 * attempt);
     }
-
-    console.log("Build data loaded. Waiting for the canvas to finish drawing (polling pixel content)…");
-    const settled = await waitForCanvasToSettle(page, CARD_CANVAS_SELECTOR);
-    console.log(settled ? "Canvas content stabilized." : "Timed out waiting for canvas to stabilize — using it anyway.");
-    await page.waitForTimeout(500);
-
-    const canvas = page.locator(CARD_CANVAS_SELECTOR).first();
-    await canvas.screenshot({ path: OUTPUT_PATH });
-    console.log(`Wrote ${OUTPUT_PATH} from the real akasha.cv card (attempt ${attempt}).`);
-    return true;
   }
-  console.log(`Gave up after ${MAX_ATTEMPTS} attempts — build data never loaded.`);
+  console.log(`Gave up after ${MAX_ATTEMPTS} attempts on enka.network.`);
   return false;
 }
 
@@ -156,81 +90,66 @@ function cardHtml({ weapon, artifactSet, critRate, critDmg, atk, dmgBonus, avgDm
   <div class="eyebrow">⚡ KEQING · MISTSPLITTER REFORGED</div>
   <h1>GH's Build</h1>
   <div class="sub">Aggravate Combo with EM buff, Avg DMG (4p TF)</div>
-  <div class="notice">akasha.cv's own card couldn't load today (their backend was temporarily unavailable) — showing the same stats instead.</div>
+  <div class="notice">Neither akasha.cv nor enka.network loaded in this run — showing the same stats instead.</div>
   <div class="grid">
     <div class="stat wide"><div class="label">Weapon</div><div class="value wide">${weapon}</div></div>
     <div class="stat wide"><div class="label">Artifact Set</div><div class="value wide">${artifactSet}</div></div>
     <div class="stat"><div class="label">Crit Rate</div><div class="value">${critRate}%</div></div>
     <div class="stat"><div class="label">Crit DMG</div><div class="value">${critDmg}%</div></div>
     <div class="stat"><div class="label">CV</div><div class="value accent">${cv}</div></div>
-    <div class="stat"><div class="label">ATK</div><div class="value">${atk.toLocaleString()}</div></div>
+    <div class="stat"><div class="label">ATK</div><div class="value">${Number(atk).toLocaleString()}</div></div>
     <div class="stat"><div class="label">DMG Bonus</div><div class="value">${dmgBonus}%</div></div>
-    <div class="stat accent"><div class="label">Avg DMG</div><div class="value accent">${avgDmg.toLocaleString()}</div></div>
+    <div class="stat accent"><div class="label">Avg DMG</div><div class="value accent">${Number(avgDmg).toLocaleString()}</div></div>
   </div>
   <div class="footer">${rankLine} — akasha.cv</div>
 </body></html>`;
 }
 
 async function captureFallbackCard(page) {
-  const FALLBACK_ATTEMPTS = 3;
-  for (let attempt = 1; attempt <= FALLBACK_ATTEMPTS; attempt++) {
-    try {
-      console.log(`Fallback attempt ${attempt}/${FALLBACK_ATTEMPTS}: fetching stats via the leaderboard API…`);
-      await page.goto(LEADERBOARD_PAGE_URL, { waitUntil: "domcontentloaded", timeout: 45000 });
+  console.log("Falling back: reading already-fetched stats from data/leaderboard.json (no extra network calls)…");
 
-      const json = await page.evaluate(async (url) => {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`Leaderboard fetch failed: ${res.status}`);
-        return res.json();
-      }, LEADERBOARD_API_URL);
-
-      const rows = json.data || [];
-      let totalPlayers = null;
-      if (json.totalRowsHash) {
-        try {
-          const sizeJson = await page.evaluate(async (hash) => {
-            const res = await fetch(`https://akasha.cv/api/getCollectionSize/?variant=charactersLb&hash=${hash}`);
-            if (!res.ok) throw new Error(`getCollectionSize failed: ${res.status}`);
-            return res.json();
-          }, json.totalRowsHash);
-          totalPlayers = sizeJson?.totalRows ?? null;
-        } catch (err) {
-          console.error("Couldn't fetch total player count (non-fatal):", err.message);
-        }
-      }
-
-      const trackedIndex = rows.findIndex((e) => e.uid === TRACKED_UID);
-      const trackedEntry = trackedIndex >= 0 ? rows[trackedIndex] : rows[0];
-      if (!trackedEntry) throw new Error("No leaderboard rows returned.");
-
-      const s = trackedEntry.stats || {};
-      const cardData = {
-        weapon: `${trackedEntry.weapon?.name || ""} ${refinementLabel(trackedEntry.weapon?.weaponInfo?.refinementLevel?.value)}`.trim(),
-        artifactSet: primaryArtifactSet(trackedEntry.artifactSets),
-        critRate: s.critRate ? (s.critRate.value * 100).toFixed(1) : "—",
-        critDmg: s.critDamage ? (s.critDamage.value * 100).toFixed(1) : "—",
-        atk: s.atk ? Math.round(s.atk.value) : 0,
-        dmgBonus: s.electroDamageBonus ? (s.electroDamageBonus.value * 100).toFixed(1) : "—",
-        avgDmg: trackedEntry.calculation?.result != null ? Math.round(trackedEntry.calculation.result) : 0,
-        cv: trackedEntry.critValue != null ? trackedEntry.critValue.toFixed(1) : "—",
-        rank: trackedIndex >= 0 ? trackedIndex + 1 : null,
-        total: totalPlayers,
-      };
-
-      await page.setContent(cardHtml(cardData), { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(300);
-      await page.screenshot({ path: OUTPUT_PATH });
-      console.log(`Wrote ${OUTPUT_PATH} (fallback card, attempt ${attempt}).`);
-      return true;
-    } catch (err) {
-      console.error(`Fallback attempt ${attempt} failed: ${err.message}`);
-      if (attempt < FALLBACK_ATTEMPTS) {
-        await page.waitForTimeout(4000 * attempt);
-      }
-    }
+  let data;
+  try {
+    const raw = await fs.readFile(LEADERBOARD_JSON_PATH, "utf8");
+    data = JSON.parse(raw);
+  } catch (err) {
+    console.error(`Couldn't read ${LEADERBOARD_JSON_PATH}: ${err.message}`);
+    return false;
   }
-  console.error(`Fallback also failed after ${FALLBACK_ATTEMPTS} attempts.`);
-  return false;
+
+  const build = data.build;
+  if (!build) {
+    console.error("data/leaderboard.json has no build data to render a fallback card from.");
+    return false;
+  }
+
+  const rankRow = data.trackedRank && Array.isArray(data.top20?.rows)
+    ? data.top20.rows.find((r) => r.rank === data.trackedRank)
+    : null;
+
+  const cardData = {
+    weapon: build.weapon || "—",
+    artifactSet: build.artifactSet || "—",
+    critRate: build.critRate != null ? build.critRate : "—",
+    critDmg: build.critDmg != null ? build.critDmg : "—",
+    atk: build.atk || 0,
+    dmgBonus: build.dmgBonus != null ? build.dmgBonus : "—",
+    avgDmg: build.avgDmg || 0,
+    cv: rankRow?.cv != null ? rankRow.cv : "—",
+    rank: data.trackedRank || null,
+    total: data.totalPlayers || null,
+  };
+
+  try {
+    await page.setContent(cardHtml(cardData), { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: OUTPUT_PATH });
+    console.log(`Wrote ${OUTPUT_PATH} (fallback card, rendered from local data).`);
+    return true;
+  } catch (err) {
+    console.error(`Rendering fallback card failed: ${err.message}`);
+    return false;
+  }
 }
 
 async function main() {
@@ -241,28 +160,21 @@ async function main() {
   const page = await browser.newPage({
     userAgent:
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    viewport: { width: 1280, height: 1400 },
+    viewport: { width: 1400, height: 900 },
   });
 
   await fs.mkdir("data", { recursive: true });
 
-  const gotRealCard = await tryCaptureRealCard(page);
-  let gotSomething = gotRealCard;
-  if (!gotRealCard) {
+  const gotEnkaCard = await tryCaptureEnkaCard(page);
+  let gotSomething = gotEnkaCard;
+  if (!gotEnkaCard) {
     gotSomething = await captureFallbackCard(page);
   }
 
   await browser.close();
 
   if (!gotSomething) {
-    // Both the real card and the fallback failed — almost certainly a
-    // transient issue on akasha.cv's end (their backend returning 503s /
-    // intermittent bot-protection false positives), not a bug in this
-    // script. Exit successfully without touching the existing
-    // data/build-screenshot.png, so yesterday's image stays in place rather
-    // than the whole workflow (and the leaderboard data step that already
-    // succeeded) getting marked as failed.
-    console.log("Couldn't get any screenshot this run — leaving the existing data/build-screenshot.png untouched.");
+    console.log("Couldn't produce any screenshot this run — leaving the existing data/build-screenshot.png untouched.");
     return;
   }
 }
