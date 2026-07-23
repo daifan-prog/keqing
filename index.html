@@ -218,6 +218,8 @@ function RankTracker() {
   const [hasSavedTop20, setHasSavedTop20] = useState(true);
   const [top20History, setTop20History] = useState(SEED_TOP20_HISTORY);
   const [expandedHistoryDate, setExpandedHistoryDate] = useState(null);
+  const [checkinLogOpen, setCheckinLogOpen] = useState(false);
+  const [snapshotHistoryOpen, setSnapshotHistoryOpen] = useState(false);
 
   useEffect(() => {
     const savedCheckins = loadJSON(CHECKINS_KEY, null);
@@ -276,7 +278,10 @@ function RankTracker() {
 
       if (data.top20 && Array.isArray(data.top20.rows) && data.top20.rows.length > 0) {
         setTop20((prevTop20) => {
-          if (prevTop20.updatedOn && prevTop20.updatedOn !== data.top20.updatedOn) {
+          // fallback only: if the deployed script hasn't started providing
+          // top20History yet (older version), keep archiving locally so nothing
+          // is lost during the transition
+          if (!Array.isArray(data.top20History) && prevTop20.updatedOn && prevTop20.updatedOn !== data.top20.updatedOn) {
             setTop20History((prevHist) => {
               if (prevHist.some((h) => h.updatedOn === prevTop20.updatedOn)) return prevHist;
               const merged = prevHist.concat([prevTop20]).sort((a, b) => (a.updatedOn < b.updatedOn ? 1 : -1));
@@ -290,6 +295,22 @@ function RankTracker() {
         setTop20Form(data.top20);
         setHasSavedTop20(true);
         setEditingTop20(false);
+      }
+
+      if (Array.isArray(data.top20History) && data.top20History.length > 0) {
+        // the automation now maintains this history itself (committed to the
+        // repo), so it's the same on every device — merge it in, keeping any
+        // local-only entries (e.g. from manually edited snapshots) that
+        // aren't already covered by the server's version
+        setTop20History((prevHist) => {
+          const serverDates = new Set(data.top20History.map((h) => h.updatedOn));
+          const localOnly = prevHist.filter((h) => !serverDates.has(h.updatedOn));
+          const merged = data.top20History
+            .concat(localOnly)
+            .sort((a, b) => (a.updatedOn < b.updatedOn ? 1 : -1));
+          saveJSON(TOP20_HISTORY_KEY, merged);
+          return merged;
+        });
       }
 
       if (data.build) {
@@ -931,7 +952,14 @@ function RankTracker() {
         </div>
 
         <div style={styles.panel}>
-          <div style={styles.panelTitle}>Check-in log</div>
+          <button onClick={() => setCheckinLogOpen(!checkinLogOpen)} style={styles.collapseHeader}>
+            <span style={{ ...styles.panelTitle, marginBottom: 0 }}>Check-in log</span>
+            <span style={styles.collapseRight}>
+              <span style={styles.collapseCount}>{sorted.length} {sorted.length === 1 ? "entry" : "entries"}</span>
+              <span style={styles.collapseChevron(checkinLogOpen)}>▾</span>
+            </span>
+          </button>
+          {checkinLogOpen && (
           <div>
             {sorted.slice().reverse().map((c) => (
               <div key={c.date} className="checkin-row" style={styles.row}>
@@ -942,7 +970,7 @@ function RankTracker() {
               </div>
             ))}
           </div>
-        </div>
+          )}        </div>
         </>
         )}
 
@@ -1047,8 +1075,17 @@ function RankTracker() {
           </div>
 
           <div style={styles.panel}>
-            <div style={styles.panelTitle}>Snapshot history</div>
-            {top20History.length <= 1 ? (
+            <button onClick={() => setSnapshotHistoryOpen(!snapshotHistoryOpen)} style={styles.collapseHeader}>
+              <span style={{ ...styles.panelTitle, marginBottom: 0 }}>Snapshot history</span>
+              <span style={styles.collapseRight}>
+                <span style={styles.collapseCount}>
+                  {top20History.length <= 1 ? "no earlier snapshots" : `${top20History.length} snapshots`}
+                </span>
+                <span style={styles.collapseChevron(snapshotHistoryOpen)}>▾</span>
+              </span>
+            </button>
+            {snapshotHistoryOpen && (
+            top20History.length <= 1 ? (
               <div style={styles.top20EditHint}>
                 No earlier snapshots yet — the next time you update the Top 20, this one gets archived here so you can compare over time.
               </div>
@@ -1090,6 +1127,7 @@ function RankTracker() {
                   </div>
                 ))}
               </div>
+            )
             )}
           </div>
           </>
@@ -1273,6 +1311,17 @@ const styles = {
   statSub: { fontSize: 10.5, color: "#6b6289" },
   panel: { background: "#151027", border: "1px solid #241c3f", borderRadius: 16, padding: "18px 20px" },
   panelTitle: { fontFamily: "'Rajdhani',sans-serif", fontSize: 15, fontWeight: 600, color: "#e8e3f5", marginBottom: 12, letterSpacing: 0.5 },
+  collapseHeader: {
+    display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%",
+    background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: 4,
+  },
+  collapseRight: { display: "flex", alignItems: "center", gap: 8 },
+  collapseCount: { fontSize: 11, color: "#6b6289", fontFamily: "'Inter',sans-serif" },
+  collapseChevron: (open) => ({
+    display: "inline-block", color: "#9a90b8", fontSize: 14,
+    transform: open ? "rotate(180deg)" : "rotate(0deg)",
+    transition: "transform 0.15s ease",
+  }),
   buildHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
   iconBtn: {
     background: "none", border: "1px solid #362a5c", borderRadius: 6, color: "#9a90b8",

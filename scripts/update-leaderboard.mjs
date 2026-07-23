@@ -26,6 +26,20 @@ function refinementLabel(value) {
   return `R${(value ?? 0) + 1}`;
 }
 
+// matches the app's own todayIso() — "updatedOn" here needs to agree with the
+// app's calendar-day boundaries, or the auto-synced check-in/history dates
+// won't line up with what the app considers "today"
+function todayIso() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date());
+  const y = parts.find((p) => p.type === "year").value;
+  const m = parts.find((p) => p.type === "month").value;
+  const d = parts.find((p) => p.type === "day").value;
+  return `${y}-${m}-${d}`;
+}
+
 function primaryArtifactSet(artifactSets) {
   if (!artifactSets) return "";
   const entries = Object.entries(artifactSets);
@@ -85,7 +99,7 @@ async function main() {
     cv: entry.critValue != null ? Number(entry.critValue.toFixed(1)) : null,
   }));
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIso();
 
   const trackedEntry = rows.find((e) => e.uid === TRACKED_UID) || rows[0];
   let build = null;
@@ -105,18 +119,61 @@ async function main() {
 
   const trackedRank = rows.findIndex((e) => e.uid === TRACKED_UID);
 
+  // maintain a rolling history of top20 snapshots, committed to the repo so
+  // every device sees the same history — read whatever's already there
+  // (from previous runs) rather than relying on each browser to track it
+  // locally. Only add a NEW entry when the top 20 has actually changed since
+  // the most recent one — otherwise every day would add an identical entry
+  // even when nothing moved, bloating the history for no reason.
+  let previousHistory = [];
+  try {
+    const existingRaw = await fs.readFile("data/leaderboard.json", "utf8");
+    const existing = JSON.parse(existingRaw);
+    if (Array.isArray(existing.top20History)) previousHistory = existing.top20History;
+  } catch (err) {
+    console.log("No existing data/leaderboard.json to read history from (first run) — starting fresh.");
+  }
+
+  function rowsContentEqual(a, b) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return JSON.stringify(a) === JSON.stringify(b);
+  }
+
+  const todaysSnapshot = { updatedOn: today, rows: top20Rows };
+  const mostRecentPrevious = previousHistory
+    .slice()
+    .sort((a, b) => (a.updatedOn < b.updatedOn ? 1 : -1))[0];
+  const unchanged = mostRecentPrevious && rowsContentEqual(mostRecentPrevious.rows, top20Rows);
+
+  const MAX_HISTORY_ENTRIES = 200;
+  let top20History;
+  if (unchanged) {
+    console.log(`Top 20 unchanged since ${mostRecentPrevious.updatedOn} — not adding a new history entry.`);
+    top20History = previousHistory;
+  } else {
+    top20History = previousHistory
+      .filter((h) => h.updatedOn !== today)
+      .concat([todaysSnapshot])
+      .sort((a, b) => (a.updatedOn < b.updatedOn ? 1 : -1))
+      .slice(0, MAX_HISTORY_ENTRIES);
+  }
+
   const output = {
     updatedOn: today,
     fetchedAt: new Date().toISOString(),
     totalPlayers,
     trackedRank: trackedRank >= 0 ? trackedRank + 1 : null,
     build,
-    top20: { updatedOn: today, rows: top20Rows },
+    top20: todaysSnapshot,
+    top20History,
   };
 
   await fs.mkdir("data", { recursive: true });
   await fs.writeFile("data/leaderboard.json", JSON.stringify(output, null, 2) + "\n");
-  console.log("Wrote data/leaderboard.json:", JSON.stringify(output, null, 2));
+  console.log(
+    `Wrote data/leaderboard.json — updatedOn=${output.updatedOn}, rank=${output.trackedRank}, ` +
+    `totalPlayers=${output.totalPlayers}, historyEntries=${top20History.length}`
+  );
 }
 
 main().catch((err) => {
