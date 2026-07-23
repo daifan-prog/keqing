@@ -54,7 +54,7 @@ async function tryCaptureEnkaCard(page) {
   return false;
 }
 
-function cardHtml({ weapon, artifactSet, critRate, critDmg, atk, dmgBonus, avgDmg, cv, rank, total }) {
+function cardHtml({ weapon, artifactSet, critRate, critDmg, atk, dmgBonus, elementalMastery, avgDmg, cv, rank, total }) {
   const rankLine = rank && total ? `#${rank} of ${total.toLocaleString()} players` : "";
   return `<!DOCTYPE html>
 <html><head><meta charset="UTF-8">
@@ -99,6 +99,7 @@ function cardHtml({ weapon, artifactSet, critRate, critDmg, atk, dmgBonus, avgDm
     <div class="stat"><div class="label">CV</div><div class="value accent">${cv}</div></div>
     <div class="stat"><div class="label">ATK</div><div class="value">${Number(atk).toLocaleString()}</div></div>
     <div class="stat"><div class="label">DMG Bonus</div><div class="value">${dmgBonus}%</div></div>
+    <div class="stat"><div class="label">Elemental Mastery</div><div class="value">${Number(elementalMastery || 0).toLocaleString()}</div></div>
     <div class="stat accent"><div class="label">Avg DMG</div><div class="value accent">${Number(avgDmg).toLocaleString()}</div></div>
   </div>
   <div class="footer">${rankLine} — akasha.cv</div>
@@ -134,6 +135,7 @@ async function captureFallbackCard(page) {
     critDmg: build.critDmg != null ? build.critDmg : "—",
     atk: build.atk || 0,
     dmgBonus: build.dmgBonus != null ? build.dmgBonus : "—",
+    elementalMastery: build.elementalMastery || 0,
     avgDmg: build.avgDmg || 0,
     cv: rankRow?.cv != null ? rankRow.cv : "—",
     rank: data.trackedRank || null,

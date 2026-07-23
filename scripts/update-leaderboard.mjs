@@ -98,6 +98,7 @@ async function main() {
       critDmg: s.critDamage ? Number((s.critDamage.value * 100).toFixed(1)) : null,
       atk: s.atk ? Math.round(s.atk.value) : null,
       dmgBonus: s.electroDamageBonus ? Number((s.electroDamageBonus.value * 100).toFixed(1)) : null,
+      elementalMastery: s.elementalMastery ? Math.round(s.elementalMastery.value) : null,
       avgDmg: trackedEntry.calculation?.result != null ? Math.round(trackedEntry.calculation.result) : null,
     };
   }
