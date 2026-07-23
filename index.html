@@ -84,12 +84,47 @@ const SEED_TOP20 = {
 };
 const SEED_TOP20_HISTORY = [SEED_TOP20];
 
+const SEED_ALLBOARDS = {
+  updatedOn: "2026-07-22",
+  rows: [
+    { category: "AGGR. 4p TF", rank: 1, total: 162000 },
+    { category: "VAPE non-4SR", rank: 2269, total: 125000 },
+    { category: "AGGR. R1", rank: 10317, total: 501000 },
+    { category: "LUNAR R1", rank: 11126, total: 362000 },
+    { category: "STELLAR 110% ER", rank: 24315, total: 456000 },
+    { category: "SUPPORT R1", rank: 33443, total: 535000 },
+    { category: "COMBO R1", rank: 11519, total: 177000 },
+    { category: "BURST R1", rank: 28953, total: 415000 },
+    { category: "COMBO 120% ER", rank: 31213, total: 440000 },
+    { category: "BURST 220% ER", rank: 25608, total: 349000 },
+    { category: "EM+ER", rank: 112004, total: 1390000 },
+    { category: "FREEZE 120% ER", rank: 26306, total: 326000 },
+    { category: "OFF-FIELD", rank: 110283, total: 1330000 },
+    { category: "C2 SKILL 130% ER", rank: 77729, total: 892000 },
+    { category: "FREEZE 11% ER", rank: 69908, total: 633000 },
+    { category: "QB COMBO 130% ER", rank: 12442, total: 96800 },
+    { category: "STELLAR 130% ER", rank: 1768, total: 10700 },
+    { category: "MAX HP", rank: 185230, total: 1050000 },
+    { category: "OVERLOAD", rank: 174627, total: 853000 },
+    { category: "COMBO 110% ER", rank: 118791, total: 516000 },
+    { category: "FREEZE 25% ER", rank: 215385, total: 836000 },
+    { category: "COMBO 29%", rank: 195322, total: 657000 },
+    { category: "COMBO 36%", rank: 53526, total: 147000 },
+    { category: "HYPER", rank: 659415, total: 1570000 },
+    { category: "MONO", rank: 537096, total: 1150000 },
+    { category: "AOE", rank: 380176, total: 481000 },
+  ],
+};
+const SEED_ALLBOARDS_HISTORY = [SEED_ALLBOARDS];
+
 const CHECKINS_KEY = "rank1:checkins";
 const BUILD_KEY = "rank1:build";
 const BUILD_IMAGE_KEY = "rank1:build-image";
 const IMAGE_TAB_KEY = "rank1:build-image-tab";
 const TOP20_KEY = "rank1:top20";
 const TOP20_HISTORY_KEY = "rank1:top20-history";
+const ALLBOARDS_KEY = "rank1:allboards";
+const ALLBOARDS_HISTORY_KEY = "rank1:allboards-history";
 
 const PROFILE_URL = "https://akasha.cv/profile/602489073";
 const BUILD_URL = "https://akasha.cv/profile/602489073?build=3522b7a268c3bb5c07a0d35bbda27828";
@@ -183,7 +218,7 @@ function RankTracker() {
   const [hasSavedBuild, setHasSavedBuild] = useState(true);
   const [customImage, setCustomImage] = useState(null);
   const [autoImage, setAutoImage] = useState(null);
-  const [imageTab, setImageTab] = useState("auto"); // "auto" | "custom"
+  const [imageTab, setImageTab] = useState("custom"); // "auto" | "custom"
   const [imageLoading, setImageLoading] = useState(false);
   const [imageErr, setImageErr] = useState("");
   const [imageModalOpen, setImageModalOpen] = useState(false);
@@ -196,11 +231,20 @@ function RankTracker() {
   const [top20History, setTop20History] = useState(SEED_TOP20_HISTORY);
   const [expandedHistoryDate, setExpandedHistoryDate] = useState(null);
 
+  const [allBoards, setAllBoards] = useState(SEED_ALLBOARDS);
+  const [allBoardsForm, setAllBoardsForm] = useState(SEED_ALLBOARDS);
+  const [editingAllBoards, setEditingAllBoards] = useState(false);
+  const [hasSavedAllBoards, setHasSavedAllBoards] = useState(true);
+  const [allBoardsHistory, setAllBoardsHistory] = useState(SEED_ALLBOARDS_HISTORY);
+  const [expandedAllBoardsDate, setExpandedAllBoardsDate] = useState(null);
+
   useEffect(() => {
     const savedCheckins = loadJSON(CHECKINS_KEY, null);
     const savedBuild = loadJSON(BUILD_KEY, null);
     const savedTop20 = loadJSON(TOP20_KEY, null);
     const savedTop20History = loadJSON(TOP20_HISTORY_KEY, null);
+    const savedAllBoards = loadJSON(ALLBOARDS_KEY, null);
+    const savedAllBoardsHistory = loadJSON(ALLBOARDS_HISTORY_KEY, null);
     let savedImage = null;
     try {
       savedImage = localStorage.getItem(BUILD_IMAGE_KEY);
@@ -228,6 +272,15 @@ function RankTracker() {
     }
     if (Array.isArray(savedTop20History) && savedTop20History.length > 0) {
       setTop20History(savedTop20History);
+    }
+    if (savedAllBoards && Array.isArray(savedAllBoards.rows) && savedAllBoards.rows.length > 0) {
+      setAllBoards(savedAllBoards);
+      setAllBoardsForm(savedAllBoards);
+      setHasSavedAllBoards(true);
+      setEditingAllBoards(false);
+    }
+    if (Array.isArray(savedAllBoardsHistory) && savedAllBoardsHistory.length > 0) {
+      setAllBoardsHistory(savedAllBoardsHistory);
     }
     if (savedImage) setCustomImage(savedImage);
     if (savedTab === "auto" || savedTab === "custom") setImageTab(savedTab);
@@ -356,6 +409,52 @@ function RankTracker() {
       .sort((a, b) => (a.updatedOn < b.updatedOn ? 1 : -1));
     setTop20History(nextHistory);
     saveJSON(TOP20_HISTORY_KEY, nextHistory);
+  };
+
+  const updateAllBoardsRow = (index, field, value) => {
+    const rows = allBoardsForm.rows.slice();
+    rows[index] = { ...rows[index], [field]: value };
+    setAllBoardsForm({ ...allBoardsForm, rows });
+  };
+
+  const addAllBoardsRow = () => {
+    setAllBoardsForm({
+      ...allBoardsForm,
+      rows: allBoardsForm.rows.concat([{ category: "", rank: "", total: "" }]),
+    });
+  };
+
+  const removeAllBoardsRow = (index) => {
+    setAllBoardsForm({
+      ...allBoardsForm,
+      rows: allBoardsForm.rows.filter((_, i) => i !== index),
+    });
+  };
+
+  const saveAllBoards = () => {
+    const cleaned = {
+      updatedOn: todayIso(),
+      rows: allBoardsForm.rows
+        .filter((r) => (r.category || "").trim() !== "")
+        .map((r) => ({
+          category: (r.category || "").trim(),
+          rank: r.rank !== "" && r.rank != null ? parseInt(r.rank, 10) : null,
+          total: r.total !== "" && r.total != null ? parseInt(r.total, 10) : null,
+        })),
+    };
+    setAllBoards(cleaned);
+    setAllBoardsForm(cleaned);
+    setHasSavedAllBoards(true);
+    setEditingAllBoards(false);
+    const ok = saveJSON(ALLBOARDS_KEY, cleaned);
+    if (!ok) setErr("All Boards saved for this session only — this browser's storage might be full or blocked.");
+
+    const nextHistory = allBoardsHistory
+      .filter((h) => h.updatedOn !== cleaned.updatedOn)
+      .concat([cleaned])
+      .sort((a, b) => (a.updatedOn < b.updatedOn ? 1 : -1));
+    setAllBoardsHistory(nextHistory);
+    saveJSON(ALLBOARDS_HISTORY_KEY, nextHistory);
   };
 
   const selectImageTab = (tab) => {
@@ -567,6 +666,9 @@ function RankTracker() {
           <button onClick={() => setActiveTab("top20")} style={styles.tabBtn(activeTab === "top20")}>
             Top 20
           </button>
+          <button onClick={() => setActiveTab("allboards")} style={styles.tabBtn(activeTab === "allboards")}>
+            All Boards
+          </button>
         </div>
 
         {activeTab === "tracker" && (
@@ -588,11 +690,11 @@ function RankTracker() {
 
           <div style={styles.screenshotBlock}>
             <div style={styles.imageTabBar}>
-              <button onClick={() => selectImageTab("auto")} style={styles.imageTabBtn(imageTab === "auto")}>
-                Auto (enka.network)
-              </button>
               <button onClick={() => selectImageTab("custom")} style={styles.imageTabBtn(imageTab === "custom")}>
                 Custom
+              </button>
+              <button onClick={() => selectImageTab("auto")} style={styles.imageTabBtn(imageTab === "auto")}>
+                Auto (enka.network)
               </button>
             </div>
 
@@ -915,6 +1017,153 @@ function RankTracker() {
                             <span style={styles.top20ColStat}>{row.cv != null ? row.cv.toFixed(1) : "—"}</span>
                           </div>
                         ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          </>
+        )}
+
+        {activeTab === "allboards" && (
+          <>
+          <div style={styles.panel}>
+            <div style={styles.buildHeader}>
+              <div style={styles.panelTitle}>All Boards — GH's Keqing</div>
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                <a className="link" style={styles.link} href={BUILD_URL} target="_blank" rel="noopener noreferrer">
+                  View live<Icon.external style={{ marginLeft: 3, marginBottom: -2 }} />
+                </a>
+                {hasSavedAllBoards && !editingAllBoards && (
+                  <button
+                    onClick={() => { setAllBoardsForm(allBoards); setEditingAllBoards(true); }}
+                    style={styles.iconBtn}
+                    aria-label="Edit all boards"
+                  >
+                    <Icon.pencil size={13} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {allBoards.updatedOn && !editingAllBoards && (
+              <div style={styles.top20Updated}>Last updated {fmtLong(allBoards.updatedOn)}</div>
+            )}
+
+            {editingAllBoards ? (
+              <div>
+                <div style={styles.top20EditHint}>
+                  Every category shown in the grid on your profile page (AGGR. 4p TF, VAPE non-4SR, LUNAR R1, etc.) — paste in the rank and total for each. Add or remove rows as categories change.
+                </div>
+                <div style={styles.top20Table}>
+                  <div style={styles.top20HeaderRow}>
+                    <span style={styles.top20ColName}>Category</span>
+                    <span style={styles.top20ColStat}>Rank</span>
+                    <span style={styles.top20ColStat}>Total</span>
+                    <span style={{ width: 28 }} />
+                  </div>
+                  {allBoardsForm.rows.map((row, i) => (
+                    <div key={i} style={styles.top20EditRow}>
+                      <input
+                        type="text"
+                        placeholder="category, e.g. AGGR. 4p TF"
+                        value={row.category}
+                        onChange={(e) => updateAllBoardsRow(i, "category", e.target.value)}
+                        style={{ ...styles.input, ...styles.top20InputName }}
+                      />
+                      <input
+                        type="number"
+                        placeholder="rank"
+                        value={row.rank}
+                        onChange={(e) => updateAllBoardsRow(i, "rank", e.target.value)}
+                        style={{ ...styles.input, ...styles.top20InputStat }}
+                      />
+                      <input
+                        type="number"
+                        placeholder="total"
+                        value={row.total}
+                        onChange={(e) => updateAllBoardsRow(i, "total", e.target.value)}
+                        style={{ ...styles.input, ...styles.top20InputStat }}
+                      />
+                      <button onClick={() => removeAllBoardsRow(i)} style={styles.delBtn} aria-label="Remove row">
+                        <Icon.trash size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+                  <button onClick={addAllBoardsRow} style={styles.smallUploadBtn}>
+                    <Icon.plus size={13} /> Add row
+                  </button>
+                  <button onClick={saveAllBoards} style={styles.button}>
+                    <Icon.plus size={14} /> Save All Boards
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={styles.top20Table}>
+                <div style={styles.top20HeaderRow}>
+                  <span style={styles.top20ColName}>Category</span>
+                  <span style={styles.top20ColStat}>Rank</span>
+                  <span style={styles.top20ColStat}>Total</span>
+                  <span style={styles.top20ColStat}>Percentile</span>
+                </div>
+                {allBoards.rows.map((row, i) => {
+                  const pct = row.rank != null && row.total ? (row.rank / row.total) * 100 : null;
+                  return (
+                    <div key={i} style={styles.top20Row(row.rank === 1)}>
+                      <span style={styles.top20ColName}>{row.category}</span>
+                      <span style={styles.top20ColStat}>{row.rank != null ? row.rank.toLocaleString() : "—"}</span>
+                      <span style={styles.top20ColStat}>{row.total != null ? row.total.toLocaleString() : "—"}</span>
+                      <span style={styles.top20ColStat}>{pct != null ? `Top ${pct.toFixed(2)}%` : "—"}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div style={styles.panel}>
+            <div style={styles.panelTitle}>Snapshot history</div>
+            {allBoardsHistory.length <= 1 ? (
+              <div style={styles.top20EditHint}>
+                No earlier snapshots yet — the next time you update All Boards, this one gets archived here so you can compare over time.
+              </div>
+            ) : (
+              <div>
+                {allBoardsHistory.map((h) => (
+                  <div key={h.updatedOn}>
+                    <button
+                      onClick={() => setExpandedAllBoardsDate(expandedAllBoardsDate === h.updatedOn ? null : h.updatedOn)}
+                      style={styles.historyDateBtn}
+                    >
+                      <span>{fmtLong(h.updatedOn)}</span>
+                      <span style={styles.historyDateSub}>
+                        {h.rows.length} categories logged
+                        {" "}{expandedAllBoardsDate === h.updatedOn ? "▲" : "▼"}
+                      </span>
+                    </button>
+                    {expandedAllBoardsDate === h.updatedOn && (
+                      <div style={styles.top20Table}>
+                        <div style={styles.top20HeaderRow}>
+                          <span style={styles.top20ColName}>Category</span>
+                          <span style={styles.top20ColStat}>Rank</span>
+                          <span style={styles.top20ColStat}>Total</span>
+                          <span style={styles.top20ColStat}>Percentile</span>
+                        </div>
+                        {h.rows.map((row, i) => {
+                          const pct = row.rank != null && row.total ? (row.rank / row.total) * 100 : null;
+                          return (
+                            <div key={i} style={styles.top20Row(row.rank === 1)}>
+                              <span style={styles.top20ColName}>{row.category}</span>
+                              <span style={styles.top20ColStat}>{row.rank != null ? row.rank.toLocaleString() : "—"}</span>
+                              <span style={styles.top20ColStat}>{row.total != null ? row.total.toLocaleString() : "—"}</span>
+                              <span style={styles.top20ColStat}>{pct != null ? `Top ${pct.toFixed(2)}%` : "—"}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
