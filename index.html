@@ -95,6 +95,12 @@ const PROFILE_URL = "https://akasha.cv/profile/602489073";
 const BUILD_URL = "https://akasha.cv/profile/602489073?build=3522b7a268c3bb5c07a0d35bbda27828";
 const BOARD_URL = "https://akasha.cv/leaderboards/1000004200/tf";
 
+// Change this to whatever PIN you want — anyone who views this page's source
+// can see it, since this is a static site with no server to keep it secret.
+// This is a friction layer against someone casually messing with your data if
+// they find the URL, not real security against someone determined.
+const EDIT_PIN = "1234";
+
 const BUILD_FIELDS = [
   { key: "weapon", label: "Weapon", placeholder: "Mistsplitter Reforged R1" },
   { key: "artifactSet", label: "Artifact set", placeholder: "4pc Thundering Fury" },
@@ -189,6 +195,12 @@ function RankTracker() {
   const [imageLoading, setImageLoading] = useState(false);
   const [imageErr, setImageErr] = useState("");
   const [imageModalOpen, setImageModalOpen] = useState(false);
+
+  const [unlocked, setUnlocked] = useState(false);
+  const [unlockAnimating, setUnlockAnimating] = useState(false);
+  const [pinInput, setPinInput] = useState("");
+  const [pinError, setPinError] = useState("");
+  const [shakeError, setShakeError] = useState(false);
 
   const [activeTab, setActiveTab] = useState("tracker");
   const [top20, setTop20] = useState(SEED_TOP20);
@@ -378,6 +390,25 @@ function RankTracker() {
     saveJSON(TOP20_HISTORY_KEY, nextHistory);
   };
 
+  const ANIMATION_DURATION_MS = 1400;
+
+  const submitPin = () => {
+    if (pinInput === EDIT_PIN) {
+      setPinError("");
+      setUnlockAnimating(true);
+      setTimeout(() => {
+        setUnlocked(true);
+        setUnlockAnimating(false);
+        setPinInput("");
+      }, ANIMATION_DURATION_MS);
+    } else {
+      setPinError("Incorrect PIN.");
+      setPinInput("");
+      setShakeError(true);
+      setTimeout(() => setShakeError(false), 500);
+    }
+  };
+
   const selectImageTab = (tab) => {
     setImageTab(tab);
     try {
@@ -521,6 +552,93 @@ function RankTracker() {
   const daysSinceTop20Update = top20.updatedOn ? toIdx(todayIso()) - toIdx(top20.updatedOn) : null;
   const top20Overdue = daysSinceTop20Update !== null && daysSinceTop20Update >= 30;
   const circumference = 2 * Math.PI * 54;
+
+  if (!unlocked) {
+    return (
+      <div style={styles.lockPage}>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Inter:wght@400;500;600&display=swap');
+          @keyframes boltDrop {
+            0% { transform: translateY(-50px) scale(0.4) rotate(-20deg); opacity: 0; }
+            55% { transform: translateY(8px) scale(1.2) rotate(6deg); opacity: 1; }
+            75% { transform: translateY(-4px) scale(0.95) rotate(-2deg); }
+            100% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
+          }
+          @keyframes glowBurst {
+            0% { transform: scale(0.2); opacity: 0.9; }
+            100% { transform: scale(3); opacity: 0; }
+          }
+          @keyframes sparkFly {
+            0% { transform: translate(0,0) scale(1); opacity: 1; }
+            100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+          }
+          @keyframes shakeX {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-8px); }
+            40% { transform: translateX(8px); }
+            60% { transform: translateX(-6px); }
+            80% { transform: translateX(6px); }
+          }
+          @keyframes fadeUp {
+            0% { opacity: 0; transform: translateY(6px); }
+            100% { opacity: 1; transform: translateY(0); }
+          }
+          .lock-shake { animation: shakeX 0.4s ease; }
+          .unlock-glow { animation: glowBurst 1s ease-out forwards; }
+          .unlock-bolt { animation: boltDrop 0.6s cubic-bezier(.34,1.56,.64,1) forwards; }
+          .unlock-spark { animation: sparkFly 0.9s ease-out forwards; }
+          .unlock-text { animation: fadeUp 0.4s ease 0.5s both; }
+        `}</style>
+
+        {unlockAnimating ? (
+          <div style={styles.unlockAnimWrap}>
+            <div className="unlock-glow" style={styles.unlockGlow} />
+            {Array.from({ length: 10 }, (_, i) => {
+              const angle = (i / 10) * Math.PI * 2;
+              const dist = 100;
+              return (
+                <div
+                  key={i}
+                  className="unlock-spark"
+                  style={{
+                    ...styles.unlockSpark,
+                    "--tx": `${Math.cos(angle) * dist}px`,
+                    "--ty": `${Math.sin(angle) * dist}px`,
+                    animationDelay: `${0.15 + i * 0.02}s`,
+                  }}
+                />
+              );
+            })}
+            <svg className="unlock-bolt" width="90" height="90" viewBox="0 0 24 24" fill="none" style={{ position: "relative", zIndex: 2 }}>
+              <path d="M13 2 L4 14 H11 L9.5 22 L20 9 H13 Z" fill="#f2c14e" stroke="#8b5cf6" strokeWidth="0.7" strokeLinejoin="round" />
+            </svg>
+            <div className="unlock-text" style={styles.unlockText}>Unlocked!</div>
+          </div>
+        ) : (
+          <div style={styles.lockCard}>
+            <Icon.bolt size={34} />
+            <h1 style={styles.lockTitle}>Rank 1 Watch</h1>
+            <div style={styles.lockSub}>Enter your PIN to continue</div>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={8}
+              value={pinInput}
+              onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ""))}
+              onKeyDown={(e) => { if (e.key === "Enter") submitPin(); }}
+              style={styles.lockInput}
+              className={shakeError ? "lock-shake" : ""}
+              autoFocus
+            />
+            {pinError && <div style={styles.errText}>{pinError}</div>}
+            <button onClick={submitPin} style={{ ...styles.button, marginTop: 14 }}>
+              Unlock
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div style={styles.page}>
@@ -1053,6 +1171,41 @@ const DIAMOND_PATTERN =
   );
 
 const styles = {
+  lockPage: {
+    background: `linear-gradient(180deg,#0e0b1f 0%,#120e24 100%), url("${DIAMOND_PATTERN}")`,
+    backgroundBlendMode: "normal, soft-light",
+    backgroundSize: "auto, 84px 84px",
+    minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
+    fontFamily: "'Inter',sans-serif", padding: 20,
+  },
+  lockCard: {
+    display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center",
+    background: "#151027", border: "1px solid #241c3f", borderRadius: 20,
+    padding: "36px 32px", maxWidth: 320, width: "100%",
+  },
+  lockTitle: { fontFamily: "'Rajdhani',sans-serif", fontSize: 26, fontWeight: 700, color: "#f3f0fb", margin: "10px 0 2px" },
+  lockSub: { fontSize: 12.5, color: "#9a90b8", marginBottom: 18 },
+  lockInput: {
+    width: "100%", textAlign: "center", letterSpacing: 6, fontSize: 20,
+    background: "#0e0b1f", border: "1px solid #362a5c", borderRadius: 10,
+    padding: "10px 12px", color: "#e8e3f5", outline: "none", fontFamily: "'JetBrains Mono',monospace",
+  },
+  unlockAnimWrap: {
+    position: "relative", width: 200, height: 200,
+    display: "flex", alignItems: "center", justifyContent: "center",
+  },
+  unlockGlow: {
+    position: "absolute", width: 60, height: 60, borderRadius: "50%",
+    background: "radial-gradient(circle, rgba(242,193,78,0.55) 0%, rgba(139,92,246,0.35) 55%, transparent 75%)",
+  },
+  unlockSpark: {
+    position: "absolute", width: 6, height: 6, borderRadius: "50%",
+    background: "#f2c14e", boxShadow: "0 0 8px 2px rgba(242,193,78,0.7)",
+  },
+  unlockText: {
+    position: "absolute", bottom: -6, fontFamily: "'Rajdhani',sans-serif", fontSize: 15,
+    fontWeight: 700, letterSpacing: 1, color: "#f2c14e",
+  },
   page: {
     background: `linear-gradient(180deg,#0e0b1f 0%,#120e24 100%), url("${DIAMOND_PATTERN}")`,
     backgroundBlendMode: "normal, soft-light",
