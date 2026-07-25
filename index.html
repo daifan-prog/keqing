@@ -579,6 +579,22 @@ function RankTracker() {
   }, [imageModalOpen]);
 
   const ringPct = Math.min(100, stats.yearPercent);
+
+  // find the most recent history snapshot that ISN'T today's current data,
+  // so we can highlight exactly what changed to reach the current standings
+  const previousTop20Snapshot = top20History.find((h) => h.updatedOn !== top20.updatedOn) || null;
+
+  const getRowChanges = (row) => {
+    if (!previousTop20Snapshot) return { rank: false, avgDmg: false, cv: false, isNew: false };
+    const prevRow = previousTop20Snapshot.rows.find((r) => r.nickname === row.nickname);
+    if (!prevRow) return { rank: false, avgDmg: false, cv: false, isNew: true };
+    return {
+      rank: prevRow.rank !== row.rank,
+      avgDmg: prevRow.avgDmg !== row.avgDmg,
+      cv: prevRow.cv !== row.cv,
+      isNew: false,
+    };
+  };
   const daysSinceTop20Update = top20.updatedOn ? toIdx(todayIso()) - toIdx(top20.updatedOn) : null;
   const top20Overdue = daysSinceTop20Update !== null && daysSinceTop20Update >= 30;
   const circumference = 2 * Math.PI * 54;
@@ -1052,6 +1068,12 @@ function RankTracker() {
                 </button>
               </div>
             ) : (
+              <>
+              {previousTop20Snapshot && (
+                <div style={styles.changeLegend}>
+                  <span style={styles.changeLegendDot} /> highlighted = changed since {fmtLong(previousTop20Snapshot.updatedOn)}
+                </div>
+              )}
               <div style={styles.top20Table}>
                 <div style={styles.top20HeaderRow}>
                   <span style={styles.top20ColRank}>#</span>
@@ -1059,18 +1081,28 @@ function RankTracker() {
                   <span style={styles.top20ColStat}>Avg DMG</span>
                   <span style={styles.top20ColStat}>CV</span>
                 </div>
-                {top20.rows.map((row) => (
-                  <div key={row.rank} style={styles.top20Row(row.rank === 1)}>
-                    <span style={styles.top20ColRank}>
-                      {row.rank === 1 ? <Icon.crown size={12} style={{ marginRight: 3, marginBottom: -1 }} /> : null}
-                      {row.rank}
-                    </span>
-                    <span style={styles.top20ColName}>{row.nickname || "—"}</span>
-                    <span style={styles.top20ColStat}>{row.avgDmg != null ? row.avgDmg.toLocaleString() : "—"}</span>
-                    <span style={styles.top20ColStat}>{row.cv != null ? row.cv.toFixed(1) : "—"}</span>
-                  </div>
-                ))}
+                {top20.rows.map((row) => {
+                  const changes = getRowChanges(row);
+                  return (
+                    <div key={row.rank} style={styles.top20Row(row.rank === 1)}>
+                      <span style={changes.rank ? styles.top20ColRankChanged : styles.top20ColRank}>
+                        {row.rank === 1 ? <Icon.crown size={12} style={{ marginRight: 3, marginBottom: -1 }} /> : null}
+                        {row.rank}
+                      </span>
+                      <span style={changes.isNew ? styles.top20ColNameNew : styles.top20ColName}>
+                        {row.nickname || "—"}{changes.isNew ? " (new)" : ""}
+                      </span>
+                      <span style={changes.avgDmg ? styles.top20ColStatChanged : styles.top20ColStat}>
+                        {row.avgDmg != null ? row.avgDmg.toLocaleString() : "—"}
+                      </span>
+                      <span style={changes.cv ? styles.top20ColStatChanged : styles.top20ColStat}>
+                        {row.cv != null ? row.cv.toFixed(1) : "—"}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
+              </>
             )}
           </div>
 
@@ -1438,8 +1470,27 @@ const styles = {
     width: 26, flexShrink: 0, fontFamily: "'Rajdhani',sans-serif", fontWeight: 700,
     color: "#c9c0e6", display: "flex", alignItems: "center",
   },
+  top20ColRankChanged: {
+    width: 26, flexShrink: 0, fontFamily: "'Rajdhani',sans-serif", fontWeight: 700,
+    color: "#f2c14e", display: "flex", alignItems: "center",
+    background: "rgba(242,193,78,0.15)", borderRadius: 4, padding: "1px 3px", margin: "-1px -3px",
+  },
   top20ColName: { flex: 1, color: "#e8e3f5", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  top20ColNameNew: {
+    flex: 1, color: "#8b5cf6", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+  },
   top20ColStat: { width: 88, flexShrink: 0, color: "#9a90b8", fontFamily: "'JetBrains Mono',monospace", fontSize: 12.5, textAlign: "right" },
+  top20ColStatChanged: {
+    width: 88, flexShrink: 0, color: "#f2c14e", fontFamily: "'JetBrains Mono',monospace", fontSize: 12.5, textAlign: "right",
+    background: "rgba(242,193,78,0.15)", borderRadius: 4, padding: "1px 3px", margin: "-1px -3px",
+  },
+  changeLegend: {
+    display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#9a90b8", marginBottom: 10,
+  },
+  changeLegendDot: {
+    width: 10, height: 10, borderRadius: 3, background: "rgba(242,193,78,0.35)", border: "1px solid rgba(242,193,78,0.6)",
+    display: "inline-block",
+  },
   top20InputName: { flex: 1, width: "auto" },
   top20InputStat: { width: 88, flexShrink: 0, textAlign: "right" },
   overdueBanner: {
