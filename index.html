@@ -323,10 +323,26 @@ function RankTracker() {
 
       if (data.updatedOn && data.trackedRank) {
         setCheckins((prevCheckins) => {
-          if (prevCheckins.some((c) => c.date === data.updatedOn)) return prevCheckins;
-          const next = prevCheckins
-            .concat([{ date: data.updatedOn, rank: data.trackedRank, total: data.totalPlayers || null, note: "Auto-synced from akasha.cv" }])
-            .sort((a, b) => (a.date < b.date ? -1 : 1));
+          const existingIdx = prevCheckins.findIndex((c) => c.date === data.updatedOn);
+          const freshRank = data.trackedRank;
+          const freshTotal = data.totalPlayers || null;
+
+          if (existingIdx === -1) {
+            const next = prevCheckins
+              .concat([{ date: data.updatedOn, rank: freshRank, total: freshTotal, note: "Auto-synced from akasha.cv" }])
+              .sort((a, b) => (a.date < b.date ? -1 : 1));
+            saveJSON(CHECKINS_KEY, next);
+            return next;
+          }
+
+          const existing = prevCheckins[existingIdx];
+          // if a later sync the same day sees a different rank/total, update it
+          // instead of leaving it frozen at whatever the first sync of the day saw
+          if (existing.rank === freshRank && existing.total === freshTotal) {
+            return prevCheckins; // nothing actually changed — avoid an unnecessary write
+          }
+          const next = prevCheckins.slice();
+          next[existingIdx] = { ...existing, rank: freshRank, total: freshTotal };
           saveJSON(CHECKINS_KEY, next);
           return next;
         });
