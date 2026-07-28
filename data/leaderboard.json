@@ -1,6 +1,6 @@
 {
-  "updatedOn": "2026-07-27",
-  "fetchedAt": "2026-07-27T16:50:26.985Z",
+  "updatedOn": "2026-07-28",
+  "fetchedAt": "2026-07-28T16:17:35.536Z",
   "totalPlayers": null,
   "trackedRank": 1,
   "build": {
@@ -14,7 +14,7 @@
     "avgDmg": 595809
   },
   "top20": {
-    "updatedOn": "2026-07-27",
+    "updatedOn": "2026-07-28",
     "rows": [
       {
         "rank": 1,
