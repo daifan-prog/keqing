@@ -321,7 +321,25 @@ function RankTracker() {
         saveJSON(BUILD_KEY, data.build);
       }
 
-      if (data.updatedOn && data.trackedRank) {
+      if (Array.isArray(data.checkins) && data.checkins.length > 0) {
+        // the automation now maintains the FULL check-in log itself (same
+        // treatment as top20History) — committed to the repo, so every
+        // device sees the same log instead of each browser only ever
+        // knowing about "today". Merge in any local-only manual entries
+        // that aren't part of the server's auto-synced set.
+        setCheckins((prevCheckins) => {
+          const serverDates = new Set(data.checkins.map((c) => c.date));
+          const localOnly = prevCheckins.filter((c) => !serverDates.has(c.date));
+          const merged = data.checkins
+            .concat(localOnly)
+            .sort((a, b) => (a.date < b.date ? -1 : 1));
+          saveJSON(CHECKINS_KEY, merged);
+          return merged;
+        });
+      } else if (data.updatedOn && data.trackedRank) {
+        // fallback only: older deployed script versions that don't provide
+        // data.checkins yet — keep syncing just today's entry so nothing
+        // breaks during the transition
         setCheckins((prevCheckins) => {
           const existingIdx = prevCheckins.findIndex((c) => c.date === data.updatedOn);
           const freshRank = data.trackedRank;
@@ -336,10 +354,8 @@ function RankTracker() {
           }
 
           const existing = prevCheckins[existingIdx];
-          // if a later sync the same day sees a different rank/total, update it
-          // instead of leaving it frozen at whatever the first sync of the day saw
           if (existing.rank === freshRank && existing.total === freshTotal) {
-            return prevCheckins; // nothing actually changed — avoid an unnecessary write
+            return prevCheckins;
           }
           const next = prevCheckins.slice();
           next[existingIdx] = { ...existing, rank: freshRank, total: freshTotal };

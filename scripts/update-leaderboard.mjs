@@ -118,20 +118,20 @@ async function main() {
   }
 
   const trackedRank = rows.findIndex((e) => e.uid === TRACKED_UID);
+  const finalRank = trackedRank >= 0 ? trackedRank + 1 : null;
 
-  // maintain a rolling history of top20 snapshots, committed to the repo so
-  // every device sees the same history — read whatever's already there
-  // (from previous runs) rather than relying on each browser to track it
-  // locally. Only add a NEW entry when the top 20 has actually changed since
-  // the most recent one — otherwise every day would add an identical entry
-  // even when nothing moved, bloating the history for no reason.
+  // read whatever's already committed once, reused for both the top20 history
+  // and the check-in log below — both are maintained here now instead of in
+  // each browser's local storage, so every device sees the same thing
   let previousHistory = [];
+  let previousCheckins = [{ date: "2026-02-02", rank: 1, total: null, note: "First reached Rank 1" }];
   try {
     const existingRaw = await fs.readFile("data/leaderboard.json", "utf8");
     const existing = JSON.parse(existingRaw);
     if (Array.isArray(existing.top20History)) previousHistory = existing.top20History;
+    if (Array.isArray(existing.checkins) && existing.checkins.length > 0) previousCheckins = existing.checkins;
   } catch (err) {
-    console.log("No existing data/leaderboard.json to read history from (first run) — starting fresh.");
+    console.log("No existing data/leaderboard.json to read from (first run) — starting fresh.");
   }
 
   function rowsContentEqual(a, b) {
@@ -158,21 +158,44 @@ async function main() {
       .slice(0, MAX_HISTORY_ENTRIES);
   }
 
+  // maintain today's check-in entry: insert if missing, update in place if
+  // rank/total have changed since an earlier run today (e.g. the morning and
+  // evening scheduled runs), leave untouched if nothing's different
+  let checkins = previousCheckins;
+  if (finalRank != null) {
+    const existingIdx = previousCheckins.findIndex((c) => c.date === today);
+    const freshEntry = { date: today, rank: finalRank, total: totalPlayers || null, note: "Auto-synced from akasha.cv" };
+    if (existingIdx === -1) {
+      checkins = previousCheckins.concat([freshEntry]).sort((a, b) => (a.date < b.date ? -1 : 1));
+      console.log(`Added new check-in for ${today}: rank=${finalRank}, total=${totalPlayers}`);
+    } else {
+      const existing = previousCheckins[existingIdx];
+      if (existing.rank === freshEntry.rank && existing.total === freshEntry.total) {
+        console.log(`Check-in for ${today} unchanged — leaving as-is.`);
+      } else {
+        checkins = previousCheckins.slice();
+        checkins[existingIdx] = { ...existing, rank: freshEntry.rank, total: freshEntry.total };
+        console.log(`Updated existing check-in for ${today}: rank=${finalRank}, total=${totalPlayers}`);
+      }
+    }
+  }
+
   const output = {
     updatedOn: today,
     fetchedAt: new Date().toISOString(),
     totalPlayers,
-    trackedRank: trackedRank >= 0 ? trackedRank + 1 : null,
+    trackedRank: finalRank,
     build,
     top20: todaysSnapshot,
     top20History,
+    checkins,
   };
 
   await fs.mkdir("data", { recursive: true });
   await fs.writeFile("data/leaderboard.json", JSON.stringify(output, null, 2) + "\n");
   console.log(
     `Wrote data/leaderboard.json — updatedOn=${output.updatedOn}, rank=${output.trackedRank}, ` +
-    `totalPlayers=${output.totalPlayers}, historyEntries=${top20History.length}`
+    `totalPlayers=${output.totalPlayers}, historyEntries=${top20History.length}, checkinEntries=${checkins.length}`
   );
 }
 

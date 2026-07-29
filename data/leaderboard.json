@@ -263,5 +263,19 @@
         }
       ]
     }
+  ],
+  "checkins": [
+    {
+      "date": "2026-02-02",
+      "rank": 1,
+      "total": null,
+      "note": "First reached Rank 1"
+    },
+    {
+      "date": "2026-07-22",
+      "rank": 1,
+      "total": 162062,
+      "note": "Auto-synced from akasha.cv"
+    }
   ]
 }
