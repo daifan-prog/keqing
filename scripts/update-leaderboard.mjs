@@ -125,13 +125,22 @@ async function main() {
   // each browser's local storage, so every device sees the same thing
   let previousHistory = [];
   let previousCheckins = [{ date: "2026-02-02", rank: 1, total: null, note: "First reached Rank 1" }];
+  let previousTotalPlayers = null;
   try {
     const existingRaw = await fs.readFile("data/leaderboard.json", "utf8");
     const existing = JSON.parse(existingRaw);
     if (Array.isArray(existing.top20History)) previousHistory = existing.top20History;
     if (Array.isArray(existing.checkins) && existing.checkins.length > 0) previousCheckins = existing.checkins;
+    if (existing.totalPlayers != null) previousTotalPlayers = existing.totalPlayers;
   } catch (err) {
     console.log("No existing data/leaderboard.json to read from (first run) — starting fresh.");
+  }
+
+  // if the fresh fetch failed to get a total (API returned 403 or similar),
+  // carry forward the last known good value rather than overwriting it with null
+  if (totalPlayers == null && previousTotalPlayers != null) {
+    console.log(`getCollectionSize returned null — carrying forward previous totalPlayers: ${previousTotalPlayers}`);
+    totalPlayers = previousTotalPlayers;
   }
 
   function rowsContentEqual(a, b) {
