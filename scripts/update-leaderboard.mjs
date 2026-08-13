@@ -78,17 +78,32 @@ async function main() {
   let totalPlayers = null;
 
   // Method 1 (preferred): scrape the total from the page's own pagination text
-  // (e.g. "1-20 of 163,261") — the page is already loaded in our browser session,
-  // and this has proven reliable even when the separate getCollectionSize API
-  // endpoint is blocked from GitHub's IPs
+  // (e.g. "1-20 of 163,261") — the page is already loaded in our browser session.
+  // We explicitly wait for the pagination to render rather than using a blind delay,
+  // since the headless CI browser can be slower than interactive use.
   try {
-    await page.waitForTimeout(2000); // let pagination render
-    totalPlayers = await page.evaluate(() => {
-      const text = document.body.innerText.replace(/,/g, "");
-      const match = text.match(/\d+-\d+ of (\d+)/);
-      return match ? parseInt(match[1], 10) : null;
-    });
-    if (totalPlayers) console.log(`Total players from page pagination: ${totalPlayers}`);
+    console.log("Waiting for pagination text to render on the page…");
+    const paginationFound = await page.waitForFunction(
+      () => {
+        const text = (document.body.innerText || "").replace(/,/g, "");
+        return /\d+-\d+ of \d+/.test(text);
+      },
+      { timeout: 15000 }
+    ).then(() => true).catch(() => false);
+
+    if (paginationFound) {
+      totalPlayers = await page.evaluate(() => {
+        const text = document.body.innerText.replace(/,/g, "");
+        const match = text.match(/\d+-\d+ of (\d+)/);
+        return match ? parseInt(match[1], 10) : null;
+      });
+    }
+
+    if (totalPlayers) {
+      console.log(`Total players from page pagination: ${totalPlayers}`);
+    } else {
+      console.log("Pagination text didn't appear or couldn't be parsed.");
+    }
   } catch (err) {
     console.error("Couldn't scrape total from page (non-fatal):", err.message);
   }
