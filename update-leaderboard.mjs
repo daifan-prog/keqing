@@ -26,6 +26,20 @@ function refinementLabel(value) {
   return `R${(value ?? 0) + 1}`;
 }
 
+// matches the app's own todayIso() — "updatedOn" here needs to agree with the
+// app's calendar-day boundaries, or the auto-synced check-in/history dates
+// won't line up with what the app considers "today"
+function todayIso() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date());
+  const y = parts.find((p) => p.type === "year").value;
+  const m = parts.find((p) => p.type === "month").value;
+  const d = parts.find((p) => p.type === "day").value;
+  return `${y}-${m}-${d}`;
+}
+
 function primaryArtifactSet(artifactSets) {
   if (!artifactSets) return "";
   const entries = Object.entries(artifactSets);
@@ -39,8 +53,14 @@ function primaryArtifactSet(artifactSets) {
 
 async function main() {
   console.log("Launching browser…");
-  const browser = await chromium.launch();
-  const page = await browser.newPage();
+  const browser = await chromium.launch({
+    args: ["--disable-blink-features=AutomationControlled"],
+  });
+  const page = await browser.newPage({
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    viewport: { width: 1280, height: 900 },
+  });
 
   console.log("Establishing a real browser session on akasha.cv…");
   await page.goto(LEADERBOARD_PAGE_URL, { waitUntil: "domcontentloaded", timeout: 45000 });
@@ -56,8 +76,26 @@ async function main() {
   console.log(`Got ${rows.length} rows.`);
 
   let totalPlayers = null;
-  if (json.totalRowsHash) {
-    console.log("Fetching total player count…");
+
+  // Method 1 (preferred): scrape the total from the page's own pagination text
+  // (e.g. "1-20 of 163,261") — the page is already loaded in our browser session,
+  // and this has proven reliable even when the separate getCollectionSize API
+  // endpoint is blocked from GitHub's IPs
+  try {
+    await page.waitForTimeout(2000); // let pagination render
+    totalPlayers = await page.evaluate(() => {
+      const text = document.body.innerText.replace(/,/g, "");
+      const match = text.match(/\d+-\d+ of (\d+)/);
+      return match ? parseInt(match[1], 10) : null;
+    });
+    if (totalPlayers) console.log(`Total players from page pagination: ${totalPlayers}`);
+  } catch (err) {
+    console.error("Couldn't scrape total from page (non-fatal):", err.message);
+  }
+
+  // Method 2 (fallback): try the dedicated API endpoint in case it works
+  if (!totalPlayers && json.totalRowsHash) {
+    console.log("Trying getCollectionSize API as fallback…");
     try {
       const sizeJson = await page.evaluate(async (hash) => {
         const res = await fetch(`https://akasha.cv/api/getCollectionSize/?variant=charactersLb&hash=${hash}`);
@@ -65,8 +103,9 @@ async function main() {
         return res.json();
       }, json.totalRowsHash);
       totalPlayers = sizeJson?.totalRows ?? null;
+      if (totalPlayers) console.log(`Total players from API: ${totalPlayers}`);
     } catch (err) {
-      console.error("Couldn't fetch total player count (non-fatal):", err.message);
+      console.error("getCollectionSize also failed (non-fatal):", err.message);
     }
   }
 
@@ -79,7 +118,7 @@ async function main() {
     cv: entry.critValue != null ? Number(entry.critValue.toFixed(1)) : null,
   }));
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIso();
 
   const trackedEntry = rows.find((e) => e.uid === TRACKED_UID) || rows[0];
   let build = null;
@@ -92,24 +131,100 @@ async function main() {
       critDmg: s.critDamage ? Number((s.critDamage.value * 100).toFixed(1)) : null,
       atk: s.atk ? Math.round(s.atk.value) : null,
       dmgBonus: s.electroDamageBonus ? Number((s.electroDamageBonus.value * 100).toFixed(1)) : null,
+      elementalMastery: s.elementalMastery ? Math.round(s.elementalMastery.value) : null,
       avgDmg: trackedEntry.calculation?.result != null ? Math.round(trackedEntry.calculation.result) : null,
     };
   }
 
   const trackedRank = rows.findIndex((e) => e.uid === TRACKED_UID);
+  const finalRank = trackedRank >= 0 ? trackedRank + 1 : null;
+
+  // read whatever's already committed once, reused for both the top20 history
+  // and the check-in log below — both are maintained here now instead of in
+  // each browser's local storage, so every device sees the same thing
+  let previousHistory = [];
+  let previousCheckins = [{ date: "2026-02-02", rank: 1, total: null, note: "First reached Rank 1" }];
+  let previousTotalPlayers = null;
+  try {
+    const existingRaw = await fs.readFile("data/leaderboard.json", "utf8");
+    const existing = JSON.parse(existingRaw);
+    if (Array.isArray(existing.top20History)) previousHistory = existing.top20History;
+    if (Array.isArray(existing.checkins) && existing.checkins.length > 0) previousCheckins = existing.checkins;
+    if (existing.totalPlayers != null) previousTotalPlayers = existing.totalPlayers;
+  } catch (err) {
+    console.log("No existing data/leaderboard.json to read from (first run) — starting fresh.");
+  }
+
+  // if the fresh fetch failed to get a total (API returned 403 or similar),
+  // carry forward the last known good value rather than overwriting it with null
+  if (totalPlayers == null && previousTotalPlayers != null) {
+    console.log(`getCollectionSize returned null — carrying forward previous totalPlayers: ${previousTotalPlayers}`);
+    totalPlayers = previousTotalPlayers;
+  }
+
+  function rowsContentEqual(a, b) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return JSON.stringify(a) === JSON.stringify(b);
+  }
+
+  const todaysSnapshot = { updatedOn: today, rows: top20Rows };
+  const mostRecentPrevious = previousHistory
+    .slice()
+    .sort((a, b) => (a.updatedOn < b.updatedOn ? 1 : -1))[0];
+  const unchanged = mostRecentPrevious && rowsContentEqual(mostRecentPrevious.rows, top20Rows);
+
+  const MAX_HISTORY_ENTRIES = 200;
+  let top20History;
+  if (unchanged) {
+    console.log(`Top 20 unchanged since ${mostRecentPrevious.updatedOn} — not adding a new history entry.`);
+    top20History = previousHistory;
+  } else {
+    top20History = previousHistory
+      .filter((h) => h.updatedOn !== today)
+      .concat([todaysSnapshot])
+      .sort((a, b) => (a.updatedOn < b.updatedOn ? 1 : -1))
+      .slice(0, MAX_HISTORY_ENTRIES);
+  }
+
+  // maintain today's check-in entry: insert if missing, update in place if
+  // rank/total have changed since an earlier run today (e.g. the morning and
+  // evening scheduled runs), leave untouched if nothing's different
+  let checkins = previousCheckins;
+  if (finalRank != null) {
+    const existingIdx = previousCheckins.findIndex((c) => c.date === today);
+    const freshEntry = { date: today, rank: finalRank, total: totalPlayers || null, note: "Auto-synced from akasha.cv" };
+    if (existingIdx === -1) {
+      checkins = previousCheckins.concat([freshEntry]).sort((a, b) => (a.date < b.date ? -1 : 1));
+      console.log(`Added new check-in for ${today}: rank=${finalRank}, total=${totalPlayers}`);
+    } else {
+      const existing = previousCheckins[existingIdx];
+      if (existing.rank === freshEntry.rank && existing.total === freshEntry.total) {
+        console.log(`Check-in for ${today} unchanged — leaving as-is.`);
+      } else {
+        checkins = previousCheckins.slice();
+        checkins[existingIdx] = { ...existing, rank: freshEntry.rank, total: freshEntry.total };
+        console.log(`Updated existing check-in for ${today}: rank=${finalRank}, total=${totalPlayers}`);
+      }
+    }
+  }
 
   const output = {
     updatedOn: today,
     fetchedAt: new Date().toISOString(),
     totalPlayers,
-    trackedRank: trackedRank >= 0 ? trackedRank + 1 : null,
+    trackedRank: finalRank,
     build,
-    top20: { updatedOn: today, rows: top20Rows },
+    top20: todaysSnapshot,
+    top20History,
+    checkins,
   };
 
   await fs.mkdir("data", { recursive: true });
   await fs.writeFile("data/leaderboard.json", JSON.stringify(output, null, 2) + "\n");
-  console.log("Wrote data/leaderboard.json:", JSON.stringify(output, null, 2));
+  console.log(
+    `Wrote data/leaderboard.json — updatedOn=${output.updatedOn}, rank=${output.trackedRank}, ` +
+    `totalPlayers=${output.totalPlayers}, historyEntries=${top20History.length}, checkinEntries=${checkins.length}`
+  );
 }
 
 main().catch((err) => {

@@ -76,8 +76,26 @@ async function main() {
   console.log(`Got ${rows.length} rows.`);
 
   let totalPlayers = null;
-  if (json.totalRowsHash) {
-    console.log("Fetching total player count…");
+
+  // Method 1 (preferred): scrape the total from the page's own pagination text
+  // (e.g. "1-20 of 163,261") — the page is already loaded in our browser session,
+  // and this has proven reliable even when the separate getCollectionSize API
+  // endpoint is blocked from GitHub's IPs
+  try {
+    await page.waitForTimeout(2000); // let pagination render
+    totalPlayers = await page.evaluate(() => {
+      const text = document.body.innerText.replace(/,/g, "");
+      const match = text.match(/\d+-\d+ of (\d+)/);
+      return match ? parseInt(match[1], 10) : null;
+    });
+    if (totalPlayers) console.log(`Total players from page pagination: ${totalPlayers}`);
+  } catch (err) {
+    console.error("Couldn't scrape total from page (non-fatal):", err.message);
+  }
+
+  // Method 2 (fallback): try the dedicated API endpoint in case it works
+  if (!totalPlayers && json.totalRowsHash) {
+    console.log("Trying getCollectionSize API as fallback…");
     try {
       const sizeJson = await page.evaluate(async (hash) => {
         const res = await fetch(`https://akasha.cv/api/getCollectionSize/?variant=charactersLb&hash=${hash}`);
@@ -85,8 +103,9 @@ async function main() {
         return res.json();
       }, json.totalRowsHash);
       totalPlayers = sizeJson?.totalRows ?? null;
+      if (totalPlayers) console.log(`Total players from API: ${totalPlayers}`);
     } catch (err) {
-      console.error("Couldn't fetch total player count (non-fatal):", err.message);
+      console.error("getCollectionSize also failed (non-fatal):", err.message);
     }
   }
 
