@@ -73,7 +73,13 @@ async function main() {
   }, LEADERBOARD_API_URL);
 
   const rows = json.data || [];
-  console.log(`Got ${rows.length} rows.`);
+  console.log(`Got ${rows.length} rows. API response keys: ${Object.keys(json).join(", ")}`);
+  // log any field that might contain the total we're looking for
+  for (const key of Object.keys(json)) {
+    if (key !== "data" && key !== "chartsData") {
+      console.log(`  json.${key} = ${JSON.stringify(json[key])}`);
+    }
+  }
 
   let totalPlayers = null;
 
