@@ -67,17 +67,12 @@ async function main() {
 
   console.log("Fetching leaderboard data + total player count in a single browser call…");
   const result = await page.evaluate(async (apiUrl) => {
-    // fetch the main leaderboard data
     const res = await fetch(apiUrl);
     if (!res.ok) throw new Error(`Leaderboard fetch failed: ${res.status}`);
     const json = await res.json();
 
-    // immediately try to get the total count using the hash from the
-    // leaderboard response — all within the same evaluate block so it
-    // counts as one continuous browser interaction, not a separate
-    // automated request (akasha.cv rate-limits to one API call per
-    // session from datacenter IPs otherwise)
     let totalRows = null;
+    let sizeDiag = "no hash";
     if (json.totalRowsHash) {
       try {
         const sizeRes = await fetch(
@@ -86,22 +81,50 @@ async function main() {
         if (sizeRes.ok) {
           const sizeJson = await sizeRes.json();
           totalRows = sizeJson?.totalRows ?? null;
+          sizeDiag = `ok, totalRows=${totalRows}`;
         } else {
-          // log the status for diagnostic purposes (visible in the Actions log)
-          console.log(`getCollectionSize returned ${sizeRes.status}`);
+          sizeDiag = `status ${sizeRes.status}`;
         }
       } catch (e) {
-        console.log(`getCollectionSize error: ${e.message}`);
+        sizeDiag = `error: ${e.message}`;
       }
     }
 
-    return { json, totalRows };
+    return { json, totalRows, sizeDiag };
   }, LEADERBOARD_API_URL);
 
   const json = result.json;
   const rows = json.data || [];
   let totalPlayers = result.totalRows;
-  console.log(`Got ${rows.length} rows. totalPlayers from getCollectionSize: ${totalPlayers}`);
+  console.log(`Got ${rows.length} rows. getCollectionSize (same evaluate): ${result.sizeDiag}`);
+
+  // Method 2: try from a completely fresh page (different request context)
+  if (!totalPlayers && json.totalRowsHash) {
+    console.log("Trying getCollectionSize from a fresh second page…");
+    try {
+      const page2 = await page.context().newPage();
+      await page2.goto(LEADERBOARD_PAGE_URL, { waitUntil: "domcontentloaded", timeout: 30000 });
+      const sizeResult = await page2.evaluate(async (hash) => {
+        try {
+          const res = await fetch(
+            `https://akasha.cv/api/getCollectionSize/?variant=charactersLb&hash=${hash}`
+          );
+          if (!res.ok) return { ok: false, status: res.status };
+          const j = await res.json();
+          return { ok: true, totalRows: j?.totalRows ?? null };
+        } catch (e) {
+          return { ok: false, error: e.message };
+        }
+      }, json.totalRowsHash);
+      console.log(`  Second page result: ${JSON.stringify(sizeResult)}`);
+      if (sizeResult.ok && sizeResult.totalRows) {
+        totalPlayers = sizeResult.totalRows;
+      }
+      await page2.close();
+    } catch (err) {
+      console.error(`  Second page approach failed: ${err.message}`);
+    }
+  }
 
   await browser.close();
 
