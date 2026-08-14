@@ -73,68 +73,63 @@ async function main() {
   }, LEADERBOARD_API_URL);
 
   const rows = json.data || [];
-  console.log(`Got ${rows.length} rows. API response keys: ${Object.keys(json).join(", ")}`);
-  // log any field that might contain the total we're looking for
-  for (const key of Object.keys(json)) {
-    if (key !== "data" && key !== "chartsData") {
-      console.log(`  json.${key} = ${JSON.stringify(json[key])}`);
-    }
-  }
+  console.log(`Got ${rows.length} rows.`);
 
   let totalPlayers = null;
 
-  // Method 1 (preferred): scrape the total from the page's own pagination text
-  // (e.g. "1-20 of 163,261") — the page is already loaded in our browser session.
-  // We explicitly wait for the pagination to render rather than using a blind delay,
-  // since the headless CI browser can be slower than interactive use.
+  // The getCollectionSize API endpoint and the page's own DOM rendering have
+  // both proven consistently blocked/non-functional from GitHub Actions' IPs.
+  // Instead, binary-search the total using the leaderboard API itself (which
+  // DOES work reliably) — request specific page numbers until we find where
+  // the data runs out. ~17 requests narrows a 0-200k range to within 20.
   try {
-    console.log("Waiting for pagination text to render on the page…");
-    const paginationFound = await page.waitForFunction(
-      () => {
-        const text = (document.body.innerText || "").replace(/,/g, "");
-        return /\d+-\d+ of \d+/.test(text);
-      },
-      { timeout: 15000 }
-    ).then(() => true).catch(() => false);
+    console.log("Estimating total players via binary search on the leaderboard API…");
+    const SEARCH_SIZE = 20;
 
-    if (paginationFound) {
-      totalPlayers = await page.evaluate(() => {
-        const text = document.body.innerText.replace(/,/g, "");
-        const match = text.match(/\d+-\d+ of (\d+)/);
-        return match ? parseInt(match[1], 10) : null;
-      });
+    async function hasDataAtPage(pg) {
+      const url = LEADERBOARD_API_URL.replace("page=1", `page=${pg}`);
+      const result = await page.evaluate(async (u) => {
+        const res = await fetch(u);
+        if (!res.ok) return false;
+        const j = await res.json();
+        return Array.isArray(j.data) && j.data.length > 0;
+      }, url);
+      return result;
     }
 
-    if (totalPlayers) {
-      console.log(`Total players from page pagination: ${totalPlayers}`);
-    } else {
-      console.log("Pagination text didn't appear or couldn't be parsed.");
+    let lo = 1;
+    let hi = 15000; // 15000 pages × 20 = 300k entries (generous upper bound)
+
+    // first confirm hi is actually past the end
+    if (await hasDataAtPage(hi)) {
+      hi = 50000; // bump up in the unlikely case there are >300k entries
+    }
+
+    while (lo < hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      if (await hasDataAtPage(mid)) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+
+    // lo is now the first page with no data; total entries is (lo - 1) * size
+    // but the last page with data might be partially full, so fetch it to count
+    const lastPageWithData = lo - 1;
+    if (lastPageWithData >= 1) {
+      const lastUrl = LEADERBOARD_API_URL.replace("page=1", `page=${lastPageWithData}`);
+      const lastPageCount = await page.evaluate(async (u) => {
+        const res = await fetch(u);
+        if (!res.ok) return 0;
+        const j = await res.json();
+        return Array.isArray(j.data) ? j.data.length : 0;
+      }, lastUrl);
+      totalPlayers = (lastPageWithData - 1) * SEARCH_SIZE + lastPageCount;
+      console.log(`Binary search result: ${totalPlayers} total players (last page ${lastPageWithData} had ${lastPageCount} entries)`);
     }
   } catch (err) {
-    console.error("Couldn't scrape total from page (non-fatal):", err.message);
-  }
-
-  // Method 2 (fallback): try navigating directly to the getCollectionSize URL
-  // as a page load — navigation requests go through a different code path than
-  // fetch/XHR in most bot-protection systems, which has been consistently
-  // blocking the fetch-based approach with 403
-  if (!totalPlayers && json.totalRowsHash) {
-    console.log("Trying getCollectionSize via direct navigation…");
-    try {
-      const sizeUrl = `https://akasha.cv/api/getCollectionSize/?variant=charactersLb&hash=${json.totalRowsHash}`;
-      const sizeResponse = await page.goto(sizeUrl, { waitUntil: "domcontentloaded", timeout: 15000 });
-      if (sizeResponse && sizeResponse.ok()) {
-        const bodyText = await page.evaluate(() => document.body.innerText);
-        console.log("getCollectionSize response body:", bodyText);
-        const parsed = JSON.parse(bodyText);
-        totalPlayers = parsed?.totalRows ?? null;
-        if (totalPlayers) console.log(`Total players from direct navigation: ${totalPlayers}`);
-      } else {
-        console.log(`getCollectionSize navigation returned status ${sizeResponse?.status()}`);
-      }
-    } catch (err) {
-      console.error("getCollectionSize via navigation also failed (non-fatal):", err.message);
-    }
+    console.error("Binary search estimation failed (non-fatal):", err.message);
   }
 
   await browser.close();
