@@ -65,80 +65,43 @@ async function main() {
   console.log("Establishing a real browser session on akasha.cv…");
   await page.goto(LEADERBOARD_PAGE_URL, { waitUntil: "domcontentloaded", timeout: 45000 });
 
-  console.log("Fetching leaderboard API from within the browser context…");
-  const json = await page.evaluate(async (url) => {
-    const res = await fetch(url);
+  console.log("Fetching leaderboard data + total player count in a single browser call…");
+  const result = await page.evaluate(async (apiUrl) => {
+    // fetch the main leaderboard data
+    const res = await fetch(apiUrl);
     if (!res.ok) throw new Error(`Leaderboard fetch failed: ${res.status}`);
-    return res.json();
+    const json = await res.json();
+
+    // immediately try to get the total count using the hash from the
+    // leaderboard response — all within the same evaluate block so it
+    // counts as one continuous browser interaction, not a separate
+    // automated request (akasha.cv rate-limits to one API call per
+    // session from datacenter IPs otherwise)
+    let totalRows = null;
+    if (json.totalRowsHash) {
+      try {
+        const sizeRes = await fetch(
+          `https://akasha.cv/api/getCollectionSize/?variant=charactersLb&hash=${json.totalRowsHash}`
+        );
+        if (sizeRes.ok) {
+          const sizeJson = await sizeRes.json();
+          totalRows = sizeJson?.totalRows ?? null;
+        } else {
+          // log the status for diagnostic purposes (visible in the Actions log)
+          console.log(`getCollectionSize returned ${sizeRes.status}`);
+        }
+      } catch (e) {
+        console.log(`getCollectionSize error: ${e.message}`);
+      }
+    }
+
+    return { json, totalRows };
   }, LEADERBOARD_API_URL);
 
+  const json = result.json;
   const rows = json.data || [];
-  console.log(`Got ${rows.length} rows.`);
-
-  let totalPlayers = null;
-
-  try {
-    console.log("Estimating total players via binary search on the leaderboard API…");
-    const SEARCH_SIZE = 20;
-
-    async function hasDataAtPage(pg) {
-      const url = LEADERBOARD_API_URL.replace("page=1", `page=${pg}`);
-      const result = await page.evaluate(async (u) => {
-        try {
-          const res = await fetch(u);
-          if (!res.ok) return { ok: false, status: res.status };
-          const j = await res.json();
-          return { ok: true, count: Array.isArray(j.data) ? j.data.length : 0 };
-        } catch (e) {
-          return { ok: false, error: e.message };
-        }
-      }, url);
-      return result;
-    }
-
-    // first check: does page=1 even work? (sanity check — main fetch already succeeded)
-    const page1Check = await hasDataAtPage(1);
-    console.log(`  Page 1 check: ${JSON.stringify(page1Check)}`);
-
-    if (!page1Check.ok || page1Check.count === 0) {
-      console.log("  Binary search aborted — even page 1 failed or returned empty.");
-    } else {
-      let lo = 1;
-      let hi = 15000;
-
-      const hiCheck = await hasDataAtPage(hi);
-      console.log(`  Page ${hi} check: ${JSON.stringify(hiCheck)}`);
-
-      if (hiCheck.ok && hiCheck.count > 0) {
-        hi = 50000;
-      }
-
-      let iterations = 0;
-      while (lo < hi && iterations < 20) {
-        iterations++;
-        const mid = Math.floor((lo + hi) / 2);
-        const midResult = await hasDataAtPage(mid);
-        if (iterations <= 3) console.log(`  Iteration ${iterations}: page ${mid} → ${JSON.stringify(midResult)}`);
-        if (midResult.ok && midResult.count > 0) {
-          lo = mid + 1;
-        } else {
-          hi = mid;
-        }
-      }
-      console.log(`  Search converged: lo=${lo}, hi=${hi} after ${iterations} iterations`);
-
-      const lastPageWithData = lo - 1;
-      if (lastPageWithData >= 1) {
-        const lastResult = await hasDataAtPage(lastPageWithData);
-        console.log(`  Last page (${lastPageWithData}): ${JSON.stringify(lastResult)}`);
-        const lastPageCount = lastResult.ok ? lastResult.count : 0;
-        totalPlayers = (lastPageWithData - 1) * SEARCH_SIZE + lastPageCount;
-        console.log(`Binary search result: ${totalPlayers} total players`);
-      }
-    }
-  } catch (err) {
-    console.error("Binary search estimation failed (non-fatal):", err.message);
-  }
+  let totalPlayers = result.totalRows;
+  console.log(`Got ${rows.length} rows. totalPlayers from getCollectionSize: ${totalPlayers}`);
 
   await browser.close();
 
