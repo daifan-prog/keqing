@@ -114,19 +114,26 @@ async function main() {
     console.error("Couldn't scrape total from page (non-fatal):", err.message);
   }
 
-  // Method 2 (fallback): try the dedicated API endpoint in case it works
+  // Method 2 (fallback): try navigating directly to the getCollectionSize URL
+  // as a page load — navigation requests go through a different code path than
+  // fetch/XHR in most bot-protection systems, which has been consistently
+  // blocking the fetch-based approach with 403
   if (!totalPlayers && json.totalRowsHash) {
-    console.log("Trying getCollectionSize API as fallback…");
+    console.log("Trying getCollectionSize via direct navigation…");
     try {
-      const sizeJson = await page.evaluate(async (hash) => {
-        const res = await fetch(`https://akasha.cv/api/getCollectionSize/?variant=charactersLb&hash=${hash}`);
-        if (!res.ok) throw new Error(`getCollectionSize failed: ${res.status}`);
-        return res.json();
-      }, json.totalRowsHash);
-      totalPlayers = sizeJson?.totalRows ?? null;
-      if (totalPlayers) console.log(`Total players from API: ${totalPlayers}`);
+      const sizeUrl = `https://akasha.cv/api/getCollectionSize/?variant=charactersLb&hash=${json.totalRowsHash}`;
+      const sizeResponse = await page.goto(sizeUrl, { waitUntil: "domcontentloaded", timeout: 15000 });
+      if (sizeResponse && sizeResponse.ok()) {
+        const bodyText = await page.evaluate(() => document.body.innerText);
+        console.log("getCollectionSize response body:", bodyText);
+        const parsed = JSON.parse(bodyText);
+        totalPlayers = parsed?.totalRows ?? null;
+        if (totalPlayers) console.log(`Total players from direct navigation: ${totalPlayers}`);
+      } else {
+        console.log(`getCollectionSize navigation returned status ${sizeResponse?.status()}`);
+      }
     } catch (err) {
-      console.error("getCollectionSize also failed (non-fatal):", err.message);
+      console.error("getCollectionSize via navigation also failed (non-fatal):", err.message);
     }
   }
 
