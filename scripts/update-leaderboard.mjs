@@ -77,11 +77,6 @@ async function main() {
 
   let totalPlayers = null;
 
-  // The getCollectionSize API endpoint and the page's own DOM rendering have
-  // both proven consistently blocked/non-functional from GitHub Actions' IPs.
-  // Instead, binary-search the total using the leaderboard API itself (which
-  // DOES work reliably) — request specific page numbers until we find where
-  // the data runs out. ~17 requests narrows a 0-200k range to within 20.
   try {
     console.log("Estimating total players via binary search on the leaderboard API…");
     const SEARCH_SIZE = 20;
@@ -89,44 +84,57 @@ async function main() {
     async function hasDataAtPage(pg) {
       const url = LEADERBOARD_API_URL.replace("page=1", `page=${pg}`);
       const result = await page.evaluate(async (u) => {
-        const res = await fetch(u);
-        if (!res.ok) return false;
-        const j = await res.json();
-        return Array.isArray(j.data) && j.data.length > 0;
+        try {
+          const res = await fetch(u);
+          if (!res.ok) return { ok: false, status: res.status };
+          const j = await res.json();
+          return { ok: true, count: Array.isArray(j.data) ? j.data.length : 0 };
+        } catch (e) {
+          return { ok: false, error: e.message };
+        }
       }, url);
       return result;
     }
 
-    let lo = 1;
-    let hi = 15000; // 15000 pages × 20 = 300k entries (generous upper bound)
+    // first check: does page=1 even work? (sanity check — main fetch already succeeded)
+    const page1Check = await hasDataAtPage(1);
+    console.log(`  Page 1 check: ${JSON.stringify(page1Check)}`);
 
-    // first confirm hi is actually past the end
-    if (await hasDataAtPage(hi)) {
-      hi = 50000; // bump up in the unlikely case there are >300k entries
-    }
+    if (!page1Check.ok || page1Check.count === 0) {
+      console.log("  Binary search aborted — even page 1 failed or returned empty.");
+    } else {
+      let lo = 1;
+      let hi = 15000;
 
-    while (lo < hi) {
-      const mid = Math.floor((lo + hi) / 2);
-      if (await hasDataAtPage(mid)) {
-        lo = mid + 1;
-      } else {
-        hi = mid;
+      const hiCheck = await hasDataAtPage(hi);
+      console.log(`  Page ${hi} check: ${JSON.stringify(hiCheck)}`);
+
+      if (hiCheck.ok && hiCheck.count > 0) {
+        hi = 50000;
       }
-    }
 
-    // lo is now the first page with no data; total entries is (lo - 1) * size
-    // but the last page with data might be partially full, so fetch it to count
-    const lastPageWithData = lo - 1;
-    if (lastPageWithData >= 1) {
-      const lastUrl = LEADERBOARD_API_URL.replace("page=1", `page=${lastPageWithData}`);
-      const lastPageCount = await page.evaluate(async (u) => {
-        const res = await fetch(u);
-        if (!res.ok) return 0;
-        const j = await res.json();
-        return Array.isArray(j.data) ? j.data.length : 0;
-      }, lastUrl);
-      totalPlayers = (lastPageWithData - 1) * SEARCH_SIZE + lastPageCount;
-      console.log(`Binary search result: ${totalPlayers} total players (last page ${lastPageWithData} had ${lastPageCount} entries)`);
+      let iterations = 0;
+      while (lo < hi && iterations < 20) {
+        iterations++;
+        const mid = Math.floor((lo + hi) / 2);
+        const midResult = await hasDataAtPage(mid);
+        if (iterations <= 3) console.log(`  Iteration ${iterations}: page ${mid} → ${JSON.stringify(midResult)}`);
+        if (midResult.ok && midResult.count > 0) {
+          lo = mid + 1;
+        } else {
+          hi = mid;
+        }
+      }
+      console.log(`  Search converged: lo=${lo}, hi=${hi} after ${iterations} iterations`);
+
+      const lastPageWithData = lo - 1;
+      if (lastPageWithData >= 1) {
+        const lastResult = await hasDataAtPage(lastPageWithData);
+        console.log(`  Last page (${lastPageWithData}): ${JSON.stringify(lastResult)}`);
+        const lastPageCount = lastResult.ok ? lastResult.count : 0;
+        totalPlayers = (lastPageWithData - 1) * SEARCH_SIZE + lastPageCount;
+        console.log(`Binary search result: ${totalPlayers} total players`);
+      }
     }
   } catch (err) {
     console.error("Binary search estimation failed (non-fatal):", err.message);
