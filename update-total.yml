@@ -1,0 +1,61 @@
+name: Update total players
+
+"on":
+  workflow_dispatch:
+    inputs:
+      total:
+        description: "Current total player count from akasha.cv (e.g. 163261)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Update totalPlayers in leaderboard.json
+        run: |
+          TOTAL="${{ github.event.inputs.total }}"
+          # validate it's actually a number
+          if ! [[ "$TOTAL" =~ ^[0-9]+$ ]]; then
+            echo "Error: '$TOTAL' is not a valid number."
+            exit 1
+          fi
+
+          echo "Updating totalPlayers to $TOTAL…"
+
+          # update totalPlayers at the top level
+          python3 -c "
+          import json, sys
+          total = int(sys.argv[1])
+          path = 'data/leaderboard.json'
+          d = json.load(open(path))
+          d['totalPlayers'] = total
+
+          # also update today's check-in entry if it exists and has null/old total
+          today = d.get('updatedOn', '')
+          for c in d.get('checkins', []):
+              if c.get('date') == today:
+                  c['total'] = total
+
+          json.dump(d, open(path, 'w'), indent=2)
+          open(path, 'a').write('\n')
+          print(f'Updated totalPlayers to {total}')
+          " "$TOTAL"
+
+      - name: Commit if changed
+        run: |
+          git config user.name "leaderboard-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/leaderboard.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Update total players to ${{ github.event.inputs.total }}"
+            git push
+          fi
