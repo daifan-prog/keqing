@@ -1,6 +1,6 @@
 {
-  "updatedOn": "2026-08-14",
-  "fetchedAt": "2026-08-14T11:32:12.259Z",
+  "updatedOn": "2026-08-15",
+  "fetchedAt": "2026-08-15T09:52:38.845Z",
   "totalPlayers": 162768,
   "trackedRank": 1,
   "build": {
@@ -14,7 +14,7 @@
     "avgDmg": 595809
   },
   "top20": {
-    "updatedOn": "2026-08-14",
+    "updatedOn": "2026-08-15",
     "rows": [
       {
         "rank": 1,
@@ -24,19 +24,19 @@
       },
       {
         "rank": 2,
-        "nickname": "\u6c90\u60a0\u7518\u9752",
+        "nickname": "沐悠甘青",
         "avgDmg": 595049,
         "cv": 268.2
       },
       {
         "rank": 3,
-        "nickname": "\u30bc\u30ed",
+        "nickname": "ゼロ",
         "avgDmg": 590236,
         "cv": 263.5
       },
       {
         "rank": 4,
-        "nickname": "\u51b7\u9177\u3001\u6674\u59d0",
+        "nickname": "冷酷、晴姐",
         "avgDmg": 588426,
         "cv": 293.1
       },
@@ -54,7 +54,7 @@
       },
       {
         "rank": 7,
-        "nickname": "\u02da\u029a\ub77c\uc784\u025e\u02da",
+        "nickname": "˚ʚ라임ɞ˚",
         "avgDmg": 585380,
         "cv": 272.1
       },
@@ -66,13 +66,13 @@
       },
       {
         "rank": 9,
-        "nickname": "\u307e\u3050",
+        "nickname": "まぐ",
         "avgDmg": 584253,
         "cv": 259.6
       },
       {
         "rank": 10,
-        "nickname": "\u9752\u7a7a\u591c\u7a7a",
+        "nickname": "青空夜空",
         "avgDmg": 583192,
         "cv": 269.7
       },
@@ -96,7 +96,7 @@
       },
       {
         "rank": 14,
-        "nickname": "\u30d9\u30ed",
+        "nickname": "ベロ",
         "avgDmg": 580805,
         "cv": 265.1
       },
@@ -108,7 +108,7 @@
       },
       {
         "rank": 16,
-        "nickname": "\u7d2b\u8272\u7535\u7535\u732b",
+        "nickname": "紫色电电猫",
         "avgDmg": 579782,
         "cv": 282.1
       },
@@ -126,7 +126,7 @@
       },
       {
         "rank": 19,
-        "nickname": "\u3044\u3067\u3042",
+        "nickname": "いであ",
         "avgDmg": 577638,
         "cv": 257.4
       },
@@ -150,19 +150,19 @@
         },
         {
           "rank": 2,
-          "nickname": "\u6c90\u60a0\u7518\u9752",
+          "nickname": "沐悠甘青",
           "avgDmg": 595049,
           "cv": 268.2
         },
         {
           "rank": 3,
-          "nickname": "\u30bc\u30ed",
+          "nickname": "ゼロ",
           "avgDmg": 590236,
           "cv": 263.5
         },
         {
           "rank": 4,
-          "nickname": "\u51b7\u9177\u3001\u6674\u59d0",
+          "nickname": "冷酷、晴姐",
           "avgDmg": 588426,
           "cv": 293.1
         },
@@ -180,7 +180,7 @@
         },
         {
           "rank": 7,
-          "nickname": "\u02da\u029a\ub77c\uc784\u025e\u02da",
+          "nickname": "˚ʚ라임ɞ˚",
           "avgDmg": 585380,
           "cv": 272.1
         },
@@ -192,13 +192,13 @@
         },
         {
           "rank": 9,
-          "nickname": "\u307e\u3050",
+          "nickname": "まぐ",
           "avgDmg": 584253,
           "cv": 259.6
         },
         {
           "rank": 10,
-          "nickname": "\u9752\u7a7a\u591c\u7a7a",
+          "nickname": "青空夜空",
           "avgDmg": 583192,
           "cv": 269.7
         },
@@ -222,7 +222,7 @@
         },
         {
           "rank": 14,
-          "nickname": "\u30d9\u30ed",
+          "nickname": "ベロ",
           "avgDmg": 580805,
           "cv": 265.1
         },
@@ -234,7 +234,7 @@
         },
         {
           "rank": 16,
-          "nickname": "\u7d2b\u8272\u7535\u7535\u732b",
+          "nickname": "紫色电电猫",
           "avgDmg": 579782,
           "cv": 282.1
         },
@@ -252,7 +252,7 @@
         },
         {
           "rank": 19,
-          "nickname": "\u3044\u3067\u3042",
+          "nickname": "いであ",
           "avgDmg": 577638,
           "cv": 257.4
         },
@@ -275,13 +275,13 @@
         },
         {
           "rank": 2,
-          "nickname": "\u6c90\u60a0\u7518\u9752",
+          "nickname": "沐悠甘青",
           "avgDmg": 595049,
           "cv": 268.2
         },
         {
           "rank": 3,
-          "nickname": "\u30bc\u30ed",
+          "nickname": "ゼロ",
           "avgDmg": 590236,
           "cv": 263.5
         },
@@ -293,13 +293,13 @@
         },
         {
           "rank": 5,
-          "nickname": "\u02da\u029a\ub77c\uc784\u025e\u02da",
+          "nickname": "˚ʚ라임ɞ˚",
           "avgDmg": 584660,
           "cv": 267.4
         },
         {
           "rank": 6,
-          "nickname": "\u307e\u3050",
+          "nickname": "まぐ",
           "avgDmg": 584253,
           "cv": 259.6
         },
@@ -311,7 +311,7 @@
         },
         {
           "rank": 8,
-          "nickname": "\u9752\u7a7a\u591c\u7a7a",
+          "nickname": "青空夜空",
           "avgDmg": 583192,
           "cv": 269.7
         },
@@ -335,7 +335,7 @@
         },
         {
           "rank": 12,
-          "nickname": "\u30d9\u30ed",
+          "nickname": "ベロ",
           "avgDmg": 580805,
           "cv": 265.1
         },
@@ -347,7 +347,7 @@
         },
         {
           "rank": 14,
-          "nickname": "\u7d2b\u8272\u7535\u7535\u732b",
+          "nickname": "紫色电电猫",
           "avgDmg": 579782,
           "cv": 282.1
         },
@@ -365,7 +365,7 @@
         },
         {
           "rank": 17,
-          "nickname": "\u3044\u3067\u3042",
+          "nickname": "いであ",
           "avgDmg": 577638,
           "cv": 257.4
         },
@@ -377,13 +377,13 @@
         },
         {
           "rank": 19,
-          "nickname": "\u5b88\u5230\u6674\u6765",
+          "nickname": "守到晴来",
           "avgDmg": 577457,
           "cv": 293
         },
         {
           "rank": 20,
-          "nickname": "\u9065",
+          "nickname": "遥",
           "avgDmg": 576518,
           "cv": 279.8
         }
@@ -411,6 +411,12 @@
     },
     {
       "date": "2026-08-14",
+      "rank": 1,
+      "total": 162768,
+      "note": "Auto-synced from akasha.cv"
+    },
+    {
+      "date": "2026-08-15",
       "rank": 1,
       "total": 162768,
       "note": "Auto-synced from akasha.cv"
