@@ -1,0 +1,1577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Rank 1 Watch</title>
+<meta name="theme-color" content="#0e0b1f" />
+<meta name="description" content="Tracks GH's Rank 1 streak on the Keqing leaderboard on akasha.cv" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="icon.svg" />
+<style>
+  html, body { margin: 0; padding: 0; background: #0e0b1f; min-height: 100vh; }
+  #root { min-height: 100vh; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.4/babel.min.js" crossorigin></script>
+</head>
+<body>
+<div id="root"><div id="loading-hint" style="color:#9a90b8;font-family:sans-serif;padding:24px;">Loading…</div></div>
+<script>
+  setTimeout(function () {
+    var hint = document.getElementById("loading-hint");
+    if (!hint) return; // app already rendered and replaced this
+    var missing = [];
+    if (typeof React === "undefined") missing.push("React");
+    if (typeof ReactDOM === "undefined") missing.push("ReactDOM");
+    if (typeof Babel === "undefined") missing.push("Babel");
+    hint.textContent = missing.length
+      ? "Couldn't load: " + missing.join(", ") + ". Your network may be blocking cdnjs.cloudflare.com — try a different network or check your browser's ad/script blocker."
+      : "Scripts loaded, but the app didn't start. Open the browser console for the error.";
+  }, 4000);
+</script>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo } = React;
+
+// ============================================================
+// Rank 1 Watch — standalone web app version.
+// Tracks GH's #1 run on the Keqing (Mistsplitter Reforged R1)
+// leaderboard on akasha.cv, anchored Feb 2, 2026.
+//
+// Same design and logic as the Claude.ai artifact version, with
+// one change: persistence uses the browser's own localStorage
+// instead of Claude's window.storage API, since this runs
+// standalone in any browser.
+// ============================================================
+
+const DAY = 86400000;
+const toIdx = (iso) => Math.floor(new Date(iso + "T00:00:00Z").getTime() / DAY);
+const todayIso = () => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date());
+  const y = parts.find((p) => p.type === "year").value;
+  const m = parts.find((p) => p.type === "month").value;
+  const d = parts.find((p) => p.type === "day").value;
+  return `${y}-${m}-${d}`;
+};
+const fmtShort = (iso) => new Date(iso + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+const fmtLong = (iso) => new Date(iso + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+const SEED_CHECKINS = [
+  { date: "2026-02-02", rank: 1, total: null, note: "First reached Rank 1" },
+  { date: "2026-07-20", rank: 1, total: 161415, note: "Confirmed live via akasha.cv" },
+];
+const SEED_BUILD = { weapon: "Mistsplitter Reforged R5", artifactSet: "Thundering Fury (4pc)", critRate: "80.8", critDmg: "262.3", atk: "2052", dmgBonus: "73.6", elementalMastery: "100", avgDmg: "595809" };
+const SEED_TOP20 = {
+  updatedOn: "2026-07-20",
+  rows: [
+    { rank: 1, nickname: "GH", avgDmg: 595809, cv: 281.4 },
+    { rank: 2, nickname: "沐悠甘青", avgDmg: 595049, cv: 268.2 },
+    { rank: 3, nickname: "ゼロ", avgDmg: 590236, cv: 263.5 },
+    { rank: 4, nickname: "kazoo", avgDmg: 586935, cv: 274.4 },
+    { rank: 5, nickname: "˚ʚ라임ɞ˚", avgDmg: 584660, cv: 267.4 },
+    { rank: 6, nickname: "まぐ", avgDmg: 584253, cv: 259.6 },
+    { rank: 7, nickname: "Cuwei", avgDmg: 583216, cv: 291.5 },
+    { rank: 8, nickname: "青空夜空", avgDmg: 583192, cv: 269.7 },
+    { rank: 9, nickname: "Tobit", avgDmg: 582193, cv: 260.5 },
+    { rank: 10, nickname: "HX386", avgDmg: 581868, cv: 267.4 },
+    { rank: 11, nickname: "Yuki", avgDmg: 581097, cv: 272.9 },
+    { rank: 12, nickname: "ベロ", avgDmg: 580805, cv: 265.1 },
+    { rank: 13, nickname: "take", avgDmg: 580498, cv: 277.5 },
+    { rank: 14, nickname: "紫色电电猫", avgDmg: 579782, cv: 282.1 },
+    { rank: 15, nickname: "Rena", avgDmg: 579469, cv: 283.0 },
+    { rank: 16, nickname: "Shinory", avgDmg: 578831, cv: 267.4 },
+    { rank: 17, nickname: "いであ", avgDmg: 577638, cv: 257.4 },
+    { rank: 18, nickname: "Firesnake", avgDmg: 577580, cv: 281.4 },
+    { rank: 19, nickname: "守到晴来", avgDmg: 577457, cv: 293.0 },
+    { rank: 20, nickname: "遥", avgDmg: 576518, cv: 279.8 },
+  ],
+};
+const SEED_TOP20_HISTORY = [SEED_TOP20];
+
+const CHECKINS_KEY = "rank1:checkins";
+const BUILD_KEY = "rank1:build";
+const BUILD_IMAGE_KEY = "rank1:build-image";
+const IMAGE_TAB_KEY = "rank1:build-image-tab";
+const TOP20_KEY = "rank1:top20";
+const TOP20_HISTORY_KEY = "rank1:top20-history";
+
+const PROFILE_URL = "https://akasha.cv/profile/602489073";
+const BUILD_URL = "https://akasha.cv/profile/602489073?build=3522b7a268c3bb5c07a0d35bbda27828";
+const BOARD_URL = "https://akasha.cv/leaderboards/1000004200/tf";
+
+// Change this to whatever PIN you want — anyone who views this page's source
+// can see it, since this is a static site with no server to keep it secret.
+// This is a friction layer against someone casually messing with your data if
+// they find the URL, not real security against someone determined.
+const EDIT_PIN = "1234";
+
+const BUILD_FIELDS = [
+  { key: "weapon", label: "Weapon", placeholder: "Mistsplitter Reforged R1" },
+  { key: "artifactSet", label: "Artifact set", placeholder: "4pc Thundering Fury" },
+  { key: "critRate", label: "Crit rate %", placeholder: "70.2", numeric: true },
+  { key: "critDmg", label: "Crit DMG %", placeholder: "180.5", numeric: true },
+  { key: "atk", label: "ATK", placeholder: "2450", numeric: true },
+  { key: "dmgBonus", label: "DMG bonus %", placeholder: "95.3", numeric: true },
+  { key: "elementalMastery", label: "Elemental Mastery", placeholder: "100", numeric: true },
+  { key: "avgDmg", label: "Avg DMG (leaderboard)", placeholder: "48920", numeric: true },
+];
+
+function loadJSON(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === null) return fallback;
+    return JSON.parse(raw);
+  } catch (e) {
+    return fallback;
+  }
+}
+
+function saveJSON(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// ---------- icons (hand-drawn, no icon library) ----------
+const Icon = {
+  crown: (p) => (
+    <svg width={p.size || 14} height={p.size || 14} viewBox="0 0 24 24" fill="none" style={p.style}>
+      <path d="M3 8l4 4 5-7 5 7 4-4-2 11H5L3 8z" fill="currentColor" />
+    </svg>
+  ),
+  bolt: (p) => (
+    <svg width={p.size || 14} height={p.size || 14} viewBox="0 0 24 24" fill="none" style={p.style}>
+      <path d="M13 2 L4 14 H11 L9.5 22 L20 9 H13 Z" fill="#8b5cf6" stroke="#f2c14e" strokeWidth="0.6" strokeLinejoin="round" />
+    </svg>
+  ),
+  plus: (p) => (
+    <svg width={p.size || 14} height={p.size || 14} viewBox="0 0 24 24" fill="none" style={p.style}>
+      <path d="M12 4v16M4 12h16" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+    </svg>
+  ),
+  trash: (p) => (
+    <svg width={p.size || 14} height={p.size || 14} viewBox="0 0 24 24" fill="none" style={p.style}>
+      <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  upload: (p) => (
+    <svg width={p.size || 14} height={p.size || 14} viewBox="0 0 24 24" fill="none" style={p.style}>
+      <path d="M12 16V4M7 9l5-5 5 5M4 20h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  pencil: (p) => (
+    <svg width={p.size || 14} height={p.size || 14} viewBox="0 0 24 24" fill="none" style={p.style}>
+      <path d="M15 4l5 5-11 11H4v-5L15 4z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+    </svg>
+  ),
+  external: (p) => (
+    <svg width={p.size || 12} height={p.size || 12} viewBox="0 0 24 24" fill="none" style={p.style}>
+      <path d="M7 17L17 7M9 7h8v8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  spinner: (p) => (
+    <svg width={p.size || 14} height={p.size || 14} viewBox="0 0 24 24" fill="none" className="spin" style={p.style}>
+      <path d="M12 2a10 10 0 1 0 10 10" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+    </svg>
+  ),
+};
+
+function RankTracker() {
+  const [checkins, setCheckins] = useState(SEED_CHECKINS);
+  const [storageReady, setStorageReady] = useState(false);
+  const [rankInput, setRankInput] = useState("1");
+  const [totalInput, setTotalInput] = useState("");
+  const [dateInput, setDateInput] = useState(todayIso());
+  const [noteInput, setNoteInput] = useState("");
+  const [err, setErr] = useState("");
+
+  const [build, setBuild] = useState(SEED_BUILD);
+  const [editingBuild, setEditingBuild] = useState(false);
+  const [buildForm, setBuildForm] = useState(SEED_BUILD);
+  const [hasSavedBuild, setHasSavedBuild] = useState(true);
+  const [customImage, setCustomImage] = useState(null);
+  const [repoCustomImage, setRepoCustomImage] = useState(null);
+  const [autoImage, setAutoImage] = useState(null);
+  const [imageTab, setImageTab] = useState("custom"); // "auto" | "custom"
+  const [imageLoading, setImageLoading] = useState(false);
+  const [imageErr, setImageErr] = useState("");
+  const [imageModalOpen, setImageModalOpen] = useState(false);
+
+  const [unlocked, setUnlocked] = useState(false);
+  const [unlockAnimating, setUnlockAnimating] = useState(false);
+  const [pinInput, setPinInput] = useState("");
+  const [pinError, setPinError] = useState("");
+  const [shakeError, setShakeError] = useState(false);
+
+  const [activeTab, setActiveTab] = useState("tracker");
+  const [top20, setTop20] = useState(SEED_TOP20);
+  const [top20Form, setTop20Form] = useState(SEED_TOP20);
+  const [editingTop20, setEditingTop20] = useState(false);
+  const [hasSavedTop20, setHasSavedTop20] = useState(true);
+  const [top20History, setTop20History] = useState(SEED_TOP20_HISTORY);
+  const [expandedHistoryDate, setExpandedHistoryDate] = useState(null);
+  const [checkinLogOpen, setCheckinLogOpen] = useState(false);
+  const [snapshotHistoryOpen, setSnapshotHistoryOpen] = useState(false);
+
+  useEffect(() => {
+    const savedCheckins = loadJSON(CHECKINS_KEY, null);
+    const savedBuild = loadJSON(BUILD_KEY, null);
+    const savedTop20 = loadJSON(TOP20_KEY, null);
+    const savedTop20History = loadJSON(TOP20_HISTORY_KEY, null);
+    let savedImage = null;
+    try {
+      savedImage = localStorage.getItem(BUILD_IMAGE_KEY);
+    } catch (e) {
+      // no screenshot saved, that's fine
+    }
+    let savedTab = null;
+    try {
+      savedTab = localStorage.getItem(IMAGE_TAB_KEY);
+    } catch (e) {
+      // no preference saved, that's fine
+    }
+    if (Array.isArray(savedCheckins) && savedCheckins.length > 0) setCheckins(savedCheckins);
+    if (savedBuild) {
+      setBuild(savedBuild);
+      setBuildForm(savedBuild);
+      setHasSavedBuild(true);
+      setEditingBuild(false);
+    }
+    if (savedTop20 && Array.isArray(savedTop20.rows) && savedTop20.rows.length > 0) {
+      setTop20(savedTop20);
+      setTop20Form(savedTop20);
+      setHasSavedTop20(true);
+      setEditingTop20(false);
+    }
+    if (Array.isArray(savedTop20History) && savedTop20History.length > 0) {
+      setTop20History(savedTop20History);
+    }
+    if (savedImage) setCustomImage(savedImage);
+    if (savedTab === "auto" || savedTab === "custom") setImageTab(savedTab);
+    setStorageReady(true);
+  }, []);
+
+  const [autoSync, setAutoSync] = useState(null); // { updatedOn, fetchedAt, totalPlayers } once a successful sync happens
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState("");
+
+  const syncFromDataFile = async (isManual) => {
+    if (isManual) {
+      setSyncing(true);
+      setSyncError("");
+    }
+    try {
+      const res = await fetch("./data/leaderboard.json", { cache: "no-store" });
+      if (!res.ok) {
+        if (isManual) setSyncError("No synced data found yet — trigger the GitHub Action first, then try again.");
+        return;
+      }
+      const data = await res.json();
+
+      if (data.top20 && Array.isArray(data.top20.rows) && data.top20.rows.length > 0) {
+        setTop20((prevTop20) => {
+          // fallback only: if the deployed script hasn't started providing
+          // top20History yet (older version), keep archiving locally so nothing
+          // is lost during the transition
+          if (!Array.isArray(data.top20History) && prevTop20.updatedOn && prevTop20.updatedOn !== data.top20.updatedOn) {
+            setTop20History((prevHist) => {
+              if (prevHist.some((h) => h.updatedOn === prevTop20.updatedOn)) return prevHist;
+              const merged = prevHist.concat([prevTop20]).sort((a, b) => (a.updatedOn < b.updatedOn ? 1 : -1));
+              saveJSON(TOP20_HISTORY_KEY, merged);
+              return merged;
+            });
+          }
+          saveJSON(TOP20_KEY, data.top20);
+          return data.top20;
+        });
+        setTop20Form(data.top20);
+        setHasSavedTop20(true);
+        setEditingTop20(false);
+      }
+
+      if (Array.isArray(data.top20History) && data.top20History.length > 0) {
+        // the automation now maintains this history itself (committed to the
+        // repo), so it's the same on every device — merge it in, keeping any
+        // local-only entries (e.g. from manually edited snapshots) that
+        // aren't already covered by the server's version
+        setTop20History((prevHist) => {
+          const serverDates = new Set(data.top20History.map((h) => h.updatedOn));
+          const localOnly = prevHist.filter((h) => !serverDates.has(h.updatedOn));
+          const merged = data.top20History
+            .concat(localOnly)
+            .sort((a, b) => (a.updatedOn < b.updatedOn ? 1 : -1));
+          saveJSON(TOP20_HISTORY_KEY, merged);
+          return merged;
+        });
+      }
+
+      if (data.build) {
+        setBuild(data.build);
+        setBuildForm(data.build);
+        setHasSavedBuild(true);
+        setEditingBuild(false);
+        saveJSON(BUILD_KEY, data.build);
+      }
+
+      if (Array.isArray(data.checkins) && data.checkins.length > 0) {
+        // the automation now maintains the FULL check-in log itself (same
+        // treatment as top20History) — committed to the repo, so every
+        // device sees the same log instead of each browser only ever
+        // knowing about "today". Merge with local entries, preferring
+        // whichever has more complete data for any given date (so a manual
+        // check-in where you typed in a real total isn't overwritten by
+        // the server's auto-synced entry with total=null).
+        setCheckins((prevCheckins) => {
+          const serverByDate = {};
+          for (const c of data.checkins) serverByDate[c.date] = c;
+          const localByDate = {};
+          for (const c of prevCheckins) localByDate[c.date] = c;
+
+          const allDates = new Set([...Object.keys(serverByDate), ...Object.keys(localByDate)]);
+          const merged = [];
+          for (const date of allDates) {
+            const s = serverByDate[date];
+            const l = localByDate[date];
+            if (s && l) {
+              // both exist for this date — prefer the one with more complete data
+              // (a real total beats null; a manual note beats "Auto-synced")
+              if (l.total != null && s.total == null) {
+                merged.push(l);
+              } else if (s.total != null && l.total == null) {
+                merged.push(s);
+              } else {
+                // both have totals (or both null) — prefer local if user manually edited it
+                merged.push(l.note && !l.note.startsWith("Auto-synced") ? l : s);
+              }
+            } else {
+              merged.push(s || l);
+            }
+          }
+          merged.sort((a, b) => (a.date < b.date ? -1 : 1));
+          saveJSON(CHECKINS_KEY, merged);
+          return merged;
+        });
+      } else if (data.updatedOn && data.trackedRank) {
+        // fallback only: older deployed script versions that don't provide
+        // data.checkins yet — keep syncing just today's entry so nothing
+        // breaks during the transition
+        setCheckins((prevCheckins) => {
+          const existingIdx = prevCheckins.findIndex((c) => c.date === data.updatedOn);
+          const freshRank = data.trackedRank;
+          const freshTotal = data.totalPlayers || null;
+
+          if (existingIdx === -1) {
+            const next = prevCheckins
+              .concat([{ date: data.updatedOn, rank: freshRank, total: freshTotal, note: "Auto-synced from akasha.cv" }])
+              .sort((a, b) => (a.date < b.date ? -1 : 1));
+            saveJSON(CHECKINS_KEY, next);
+            return next;
+          }
+
+          const existing = prevCheckins[existingIdx];
+          if (existing.rank === freshRank && existing.total === freshTotal) {
+            return prevCheckins;
+          }
+          const next = prevCheckins.slice();
+          next[existingIdx] = { ...existing, rank: freshRank, total: freshTotal };
+          saveJSON(CHECKINS_KEY, next);
+          return next;
+        });
+      }
+
+      setAutoSync({ updatedOn: data.updatedOn, fetchedAt: data.fetchedAt, totalPlayers: data.totalPlayers });
+
+      setAutoImage(`./data/build-screenshot.png?t=${encodeURIComponent(data.fetchedAt || data.updatedOn || Date.now())}`);
+    } catch (e) {
+      if (isManual) setSyncError("Couldn't reach data/leaderboard.json — check it's deployed at that path.");
+    } finally {
+      if (isManual) setSyncing(false);
+    }
+  };
+
+  const checkRepoCustomImage = async () => {
+    // Optional: if the person committed their own image to the repo at this
+    // fixed path (rather than uploading it per-device), it shows up on every
+    // device that opens this same hosted site — no backend or secret needed,
+    // since it's just a normal file they added themselves via GitHub.
+    try {
+      const res = await fetch("./data/custom-screenshot.png", { method: "HEAD", cache: "no-store" });
+      if (res.ok) {
+        setRepoCustomImage(`./data/custom-screenshot.png?t=${Date.now()}`);
+      } else {
+        setRepoCustomImage(null);
+      }
+    } catch (e) {
+      setRepoCustomImage(null);
+    }
+  };
+
+  useEffect(() => {
+    // Optional: if this app is hosted alongside data/leaderboard.json (see the
+    // GitHub Actions workflow in this bundle), pull it in automatically and use
+    // it as the current build/top20/check-in data. If the file doesn't exist —
+    // e.g. running locally, or the Action hasn't run yet — this just silently
+    // does nothing and the app keeps whatever's already loaded.
+    syncFromDataFile(false);
+    checkRepoCustomImage();
+  }, []);
+
+  const persistCheckins = (next) => {
+    setCheckins(next);
+    const ok = saveJSON(CHECKINS_KEY, next);
+    if (!ok) setErr("Saved for this session only — this browser's storage might be full or blocked.");
+  };
+
+  const saveBuild = () => {
+    const cleaned = {};
+    BUILD_FIELDS.forEach(({ key, numeric }) => {
+      const raw = (buildForm[key] ?? "").toString().trim();
+      cleaned[key] = numeric ? (raw ? parseFloat(raw) : null) : raw;
+    });
+    setBuild(cleaned);
+    setBuildForm(cleaned);
+    setHasSavedBuild(true);
+    setEditingBuild(false);
+    const ok = saveJSON(BUILD_KEY, cleaned);
+    if (!ok) setErr("Build saved for this session only — this browser's storage might be full or blocked.");
+  };
+
+  const updateTop20Row = (index, field, value) => {
+    const rows = top20Form.rows.slice();
+    rows[index] = { ...rows[index], [field]: value };
+    setTop20Form({ ...top20Form, rows });
+  };
+
+  const saveTop20 = () => {
+    const cleaned = {
+      updatedOn: todayIso(),
+      rows: top20Form.rows.map((r) => ({
+        rank: r.rank,
+        nickname: (r.nickname || "").trim(),
+        avgDmg: r.avgDmg !== "" && r.avgDmg != null ? parseFloat(r.avgDmg) : null,
+        cv: r.cv !== "" && r.cv != null ? parseFloat(r.cv) : null,
+      })),
+    };
+    setTop20(cleaned);
+    setTop20Form(cleaned);
+    setHasSavedTop20(true);
+    setEditingTop20(false);
+    const ok = saveJSON(TOP20_KEY, cleaned);
+    if (!ok) setErr("Top 20 saved for this session only — this browser's storage might be full or blocked.");
+
+    const nextHistory = top20History
+      .filter((h) => h.updatedOn !== cleaned.updatedOn)
+      .concat([cleaned])
+      .sort((a, b) => (a.updatedOn < b.updatedOn ? 1 : -1));
+    setTop20History(nextHistory);
+    saveJSON(TOP20_HISTORY_KEY, nextHistory);
+  };
+
+  const ANIMATION_DURATION_MS = 1400;
+
+  const submitPin = () => {
+    if (pinInput === EDIT_PIN) {
+      setPinError("");
+      setUnlockAnimating(true);
+      setTimeout(() => {
+        setUnlocked(true);
+        setUnlockAnimating(false);
+        setPinInput("");
+      }, ANIMATION_DURATION_MS);
+    } else {
+      setPinError("Incorrect PIN.");
+      setPinInput("");
+      setShakeError(true);
+      setTimeout(() => setShakeError(false), 500);
+    }
+  };
+
+  const selectImageTab = (tab) => {
+    setImageTab(tab);
+    try {
+      localStorage.setItem(IMAGE_TAB_KEY, tab);
+    } catch (e) {
+      // non-fatal — just won't be remembered next visit
+    }
+  };
+
+  const handleImageUpload = (file) => {
+    setImageErr("");
+    setImageLoading(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      setCustomImage(dataUrl);
+      selectImageTab("custom");
+      setImageLoading(false);
+      try {
+        localStorage.setItem(BUILD_IMAGE_KEY, dataUrl);
+      } catch (e) {
+        setImageErr("Screenshot shown, but it's too large to save to this browser's storage.");
+      }
+    };
+    reader.onerror = () => {
+      setImageErr("Couldn't read that file — try a different image.");
+      setImageLoading(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeBuildImage = () => {
+    setCustomImage(null);
+    try {
+      localStorage.removeItem(BUILD_IMAGE_KEY);
+    } catch (e) {
+      // already cleared from view either way
+    }
+  };
+
+  const submit = () => {
+    setErr("");
+    const rank = parseInt(rankInput, 10);
+    if (!dateInput) return setErr("Pick a date.");
+    if (!rank || rank < 1) return setErr("Rank must be a positive number.");
+    if (dateInput > todayIso()) return setErr("Can't log a future date.");
+    const total = totalInput.trim() ? parseInt(totalInput, 10) : null;
+    if (totalInput.trim() && (!total || total < rank)) return setErr("Total players must be a number ≥ rank.");
+    const next = checkins.filter((c) => c.date !== dateInput).concat([{ date: dateInput, rank, total, note: noteInput.trim() }]);
+    persistCheckins(next.sort((a, b) => (a.date < b.date ? -1 : 1)));
+    setNoteInput("");
+    setTotalInput("");
+  };
+
+  const remove = (date) => {
+    const sortedNow = checkins.slice().sort((a, b) => (a.date < b.date ? -1 : 1));
+    if (sortedNow.length <= 1) {
+      window.alert("You need at least one check-in — this is your only one, so it can't be deleted. Log a new one first if you want to replace it.");
+      return;
+    }
+    if (date === sortedNow[0]?.date) {
+      if (!window.confirm("This is your earliest logged check-in — removing it changes your all-time anchor date. Continue?")) return;
+    }
+    persistCheckins(checkins.filter((c) => c.date !== date));
+  };
+
+  const sorted = useMemo(() => {
+    const base = checkins.length > 0 ? checkins : SEED_CHECKINS;
+    return base.slice().sort((a, b) => (a.date < b.date ? -1 : 1));
+  }, [checkins]);
+
+  const stats = useMemo(() => {
+    const today = todayIso();
+    const todayIdx = toIdx(today);
+    const anchorIdx = toIdx(sorted[0].date);
+
+    const intervals = sorted.map((c, i) => {
+      const start = toIdx(c.date);
+      const end = i + 1 < sorted.length ? toIdx(sorted[i + 1].date) - 1 : todayIdx;
+      return { start, end: Math.max(start, end), rank: c.rank };
+    });
+
+    const overlapAtRank1 = (rs, re) =>
+      intervals.reduce((sum, iv) => {
+        if (iv.rank !== 1) return sum;
+        const s = Math.max(iv.start, rs);
+        const e = Math.min(iv.end, re);
+        return sum + Math.max(0, e - s + 1);
+      }, 0);
+
+    const currentYear = Number(today.slice(0, 4));
+    const isLeapYear = (currentYear % 4 === 0 && currentYear % 100 !== 0) || currentYear % 400 === 0;
+    const daysInYear = isLeapYear ? 366 : 365;
+    const yearStartIdx = toIdx(`${currentYear}-01-01`);
+    const daysElapsedYTD = todayIdx - yearStartIdx + 1;
+    const daysLeftInYear = daysInYear - daysElapsedYTD;
+    const daysAtRank1YTD = overlapAtRank1(yearStartIdx, todayIdx);
+    const ytdPercent = daysElapsedYTD > 0 ? (daysAtRank1YTD / daysElapsedYTD) * 100 : 0;
+    const yearPercent = (daysAtRank1YTD / daysInYear) * 100;
+
+    const totalDaysAtRank1 = overlapAtRank1(anchorIdx, todayIdx);
+    const daysSinceAnchor = todayIdx - anchorIdx + 1;
+
+    const lastInterval = intervals[intervals.length - 1];
+    const currentRank = sorted[sorted.length - 1].rank;
+    // walk backward merging consecutive same-rank intervals so re-confirming
+    // the same rank on a later date doesn't reset the streak to that date
+    let streakStartIdx = lastInterval.start;
+    for (let i = intervals.length - 2; i >= 0; i--) {
+      if (intervals[i].rank === currentRank) {
+        streakStartIdx = intervals[i].start;
+      } else {
+        break;
+      }
+    }
+    const currentStreak = currentRank === 1 ? todayIdx - streakStartIdx + 1 : 0;
+
+    const chartPoints = sorted.map((c) => ({ date: c.date, rank: c.rank }));
+    if (sorted[sorted.length - 1].date !== today) {
+      chartPoints.push({ date: today, rank: currentRank });
+    }
+    const maxRank = Math.max(4, ...sorted.map((c) => c.rank));
+
+    let lastKnownTotal = null;
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      if (sorted[i].total) { lastKnownTotal = sorted[i].total; break; }
+    }
+    const percentile = lastKnownTotal ? (currentRank / lastKnownTotal) * 100 : null;
+
+    return { ytdPercent, yearPercent, daysAtRank1YTD, daysElapsedYTD, daysLeftInYear, daysInYear, currentYear, totalDaysAtRank1, daysSinceAnchor, currentRank, currentStreak, chartPoints, maxRank, lastKnownTotal, percentile };
+  }, [sorted]);
+
+  useEffect(() => {
+    if (!imageModalOpen) return;
+    const onKey = (e) => { if (e.key === "Escape") setImageModalOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [imageModalOpen]);
+
+  const ringPct = Math.min(100, stats.yearPercent);
+
+  // find the most recent history snapshot that ISN'T today's current data,
+  // so we can highlight exactly what changed to reach the current standings
+  const previousTop20Snapshot = top20History.find((h) => h.updatedOn !== top20.updatedOn) || null;
+
+  const getRowChanges = (row) => {
+    if (!previousTop20Snapshot) return { rank: false, avgDmg: false, cv: false, isNew: false };
+    const prevRow = previousTop20Snapshot.rows.find((r) => r.nickname === row.nickname);
+    if (!prevRow) return { rank: false, avgDmg: false, cv: false, isNew: true };
+    return {
+      rank: prevRow.rank !== row.rank,
+      avgDmg: prevRow.avgDmg !== row.avgDmg,
+      cv: prevRow.cv !== row.cv,
+      isNew: false,
+    };
+  };
+  const daysSinceTop20Update = top20.updatedOn ? toIdx(todayIso()) - toIdx(top20.updatedOn) : null;
+  const top20Overdue = daysSinceTop20Update !== null && daysSinceTop20Update >= 30;
+  const circumference = 2 * Math.PI * 54;
+
+  if (!unlocked) {
+    return (
+      <div style={styles.lockPage}>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Inter:wght@400;500;600&display=swap');
+          @keyframes boltDrop {
+            0% { transform: translateY(-50px) scale(0.4) rotate(-20deg); opacity: 0; }
+            55% { transform: translateY(8px) scale(1.2) rotate(6deg); opacity: 1; }
+            75% { transform: translateY(-4px) scale(0.95) rotate(-2deg); }
+            100% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
+          }
+          @keyframes glowBurst {
+            0% { transform: scale(0.2); opacity: 0.9; }
+            100% { transform: scale(3); opacity: 0; }
+          }
+          @keyframes sparkFly {
+            0% { transform: translate(0,0) scale(1); opacity: 1; }
+            100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+          }
+          @keyframes shakeX {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-8px); }
+            40% { transform: translateX(8px); }
+            60% { transform: translateX(-6px); }
+            80% { transform: translateX(6px); }
+          }
+          @keyframes fadeUp {
+            0% { opacity: 0; transform: translateY(6px); }
+            100% { opacity: 1; transform: translateY(0); }
+          }
+          .lock-shake { animation: shakeX 0.4s ease; }
+          .unlock-glow { animation: glowBurst 1s ease-out forwards; }
+          .unlock-bolt { animation: boltDrop 0.6s cubic-bezier(.34,1.56,.64,1) forwards; }
+          .unlock-spark { animation: sparkFly 0.9s ease-out forwards; }
+          .unlock-text { animation: fadeUp 0.4s ease 0.5s both; }
+        `}</style>
+
+        {unlockAnimating ? (
+          <div style={styles.unlockAnimWrap}>
+            <div className="unlock-glow" style={styles.unlockGlow} />
+            {Array.from({ length: 10 }, (_, i) => {
+              const angle = (i / 10) * Math.PI * 2;
+              const dist = 100;
+              return (
+                <div
+                  key={i}
+                  className="unlock-spark"
+                  style={{
+                    ...styles.unlockSpark,
+                    "--tx": `${Math.cos(angle) * dist}px`,
+                    "--ty": `${Math.sin(angle) * dist}px`,
+                    animationDelay: `${0.15 + i * 0.02}s`,
+                  }}
+                />
+              );
+            })}
+            <svg className="unlock-bolt" width="90" height="90" viewBox="0 0 24 24" fill="none" style={{ position: "relative", zIndex: 2 }}>
+              <path d="M13 2 L4 14 H11 L9.5 22 L20 9 H13 Z" fill="#f2c14e" stroke="#8b5cf6" strokeWidth="0.7" strokeLinejoin="round" />
+            </svg>
+            <div className="unlock-text" style={styles.unlockText}>Unlocked!</div>
+          </div>
+        ) : (
+          <div style={styles.lockCard}>
+            <Icon.bolt size={34} />
+            <h1 style={styles.lockTitle}>Rank 1 Watch</h1>
+            <div style={styles.lockSub}>Enter your PIN to continue</div>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={8}
+              value={pinInput}
+              onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ""))}
+              onKeyDown={(e) => { if (e.key === "Enter") submitPin(); }}
+              style={styles.lockInput}
+              className={shakeError ? "lock-shake" : ""}
+              autoFocus
+            />
+            {pinError && <div style={styles.errText}>{pinError}</div>}
+            <button onClick={submitPin} style={{ ...styles.button, marginTop: 14 }}>
+              Unlock
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.page}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+        * { box-sizing: border-box; }
+        input::placeholder { color: #6b6289; }
+        input, button { font-family: 'Inter', sans-serif; }
+        .checkin-row:hover { background: rgba(139,92,246,0.08); }
+        .del-btn { opacity: 0; transition: opacity .15s; }
+        .checkin-row:hover .del-btn { opacity: 1; }
+        a.link:hover { color: #c4b5fd; }
+        .spin { animation: spin 0.9s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      `}</style>
+
+      <div style={styles.container}>
+        {!storageReady && (
+          <div style={styles.syncBanner}>
+            <Icon.spinner size={12} /> Loading saved data…
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <div style={styles.siteStrip}>
+            <span style={styles.siteStripDot} />
+            akasha.cv · Genshin Leaderboards
+          </div>
+          {autoSync && (
+            <div style={styles.autoSyncBadge}>
+              <Icon.bolt size={11} /> Auto-synced {fmtLong(autoSync.updatedOn)}
+            </div>
+          )}
+          <button onClick={() => { syncFromDataFile(true); checkRepoCustomImage(); }} disabled={syncing} style={styles.syncBtn}>
+            {syncing ? <Icon.spinner size={12} /> : <Icon.upload size={12} style={{ transform: "rotate(180deg)" }} />}
+            {syncing ? "Syncing…" : "Sync now"}
+          </button>
+        </div>
+        {syncError && <div style={styles.errText}>{syncError}</div>}
+
+        <div style={styles.header}>
+          <div>
+            <div style={styles.eyebrow}>
+              <Icon.bolt />
+              KEQING · MISTSPLITTER REFORGED R5
+            </div>
+            <h1 style={styles.h1}>Rank&nbsp;1 Watch</h1>
+            <div style={styles.subtext}>
+              Tracking <a className="link" style={styles.link} href={PROFILE_URL} target="_blank" rel="noopener noreferrer">GH<Icon.external style={{ marginLeft: 3, marginBottom: -2 }} /></a>
+              {" "}on the{" "}
+              <a className="link" style={styles.link} href={BOARD_URL} target="_blank" rel="noopener noreferrer">Keqing leaderboard<Icon.external style={{ marginLeft: 3, marginBottom: -2 }} /></a>
+            </div>
+          </div>
+          <div style={styles.currentBadge(stats.currentRank)}>
+            {stats.currentRank === 1 ? <Icon.crown size={16} /> : null}
+            RANK #{stats.currentRank}{stats.lastKnownTotal ? ` / ${stats.lastKnownTotal.toLocaleString()}` : ""}
+          </div>
+        </div>
+
+        <div style={styles.tabBar}>
+          <button onClick={() => setActiveTab("tracker")} style={styles.tabBtn(activeTab === "tracker")}>
+            My tracker
+          </button>
+          <button onClick={() => setActiveTab("top20")} style={styles.tabBtn(activeTab === "top20")}>
+            Top 20
+          </button>
+        </div>
+
+        {activeTab === "tracker" && (
+        <>
+        <div style={styles.panel}>
+          <div style={styles.buildHeader}>
+            <div style={styles.panelTitle}>My build</div>
+            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+              <a className="link" style={styles.link} href={BUILD_URL} target="_blank" rel="noopener noreferrer">
+                View live<Icon.external style={{ marginLeft: 3, marginBottom: -2 }} />
+              </a>
+              {hasSavedBuild && !editingBuild && (
+                <button onClick={() => { setBuildForm(build); setEditingBuild(true); }} style={styles.iconBtn} aria-label="Edit build">
+                  <Icon.pencil size={13} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div style={styles.screenshotBlock}>
+            <div style={styles.imageTabBar}>
+              <button onClick={() => selectImageTab("custom")} style={styles.imageTabBtn(imageTab === "custom")}>
+                Custom
+              </button>
+              <button onClick={() => selectImageTab("auto")} style={styles.imageTabBtn(imageTab === "auto")}>
+                Auto (enka.network)
+              </button>
+            </div>
+
+            {imageTab === "auto" ? (
+              autoImage ? (
+                <div>
+                  <button
+                    onClick={() => setImageModalOpen(true)}
+                    style={styles.screenshotBtn}
+                    aria-label="View full-size screenshot"
+                  >
+                    <img
+                      src={autoImage}
+                      alt="Auto-synced Keqing build screenshot"
+                      style={styles.screenshotImg}
+                      onError={() => setAutoImage(null)}
+                    />
+                    <div style={styles.screenshotHint}>Click to view full size · synced from enka.network</div>
+                  </button>
+                </div>
+              ) : (
+                <div style={styles.autoImagePlaceholder}>
+                  No auto-synced image yet — it'll appear here after the next daily update, or switch to the Custom tab to upload your own in the meantime.
+                </div>
+              )
+            ) : repoCustomImage ? (
+              <div>
+                <button
+                  onClick={() => setImageModalOpen(true)}
+                  style={styles.screenshotBtn}
+                  aria-label="View full-size screenshot"
+                >
+                  <img
+                    src={repoCustomImage}
+                    alt="Custom Keqing build screenshot"
+                    style={styles.screenshotImg}
+                    onError={() => setRepoCustomImage(null)}
+                  />
+                  <div style={styles.screenshotHint}>Click to view full size · synced across all your devices</div>
+                </button>
+                <div style={styles.repoImageNote}>
+                  To change this, replace <code style={styles.inlineCode}>data/custom-screenshot.png</code> in your repo — it'll update here automatically.
+                </div>
+              </div>
+            ) : customImage ? (
+              <div>
+                <button
+                  onClick={() => setImageModalOpen(true)}
+                  style={styles.screenshotBtn}
+                  aria-label="View full-size screenshot"
+                >
+                  <img src={customImage} alt="Custom Keqing build screenshot" style={styles.screenshotImg} />
+                  <div style={styles.screenshotHint}>Click to view full size · this device only</div>
+                </button>
+                <div style={styles.screenshotActions}>
+                  <label style={styles.smallUploadBtn}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      onChange={(e) => { if (e.target.files[0]) handleImageUpload(e.target.files[0]); e.target.value = ""; }}
+                    />
+                    {imageLoading ? <Icon.spinner size={13} /> : <Icon.upload size={13} />} Replace
+                  </label>
+                  <button onClick={removeBuildImage} style={styles.smallUploadBtn}>
+                    <Icon.trash size={13} /> Remove
+                  </button>
+                </div>
+                <div style={styles.repoImageNote}>
+                  Want this to show on all your devices? Commit the image to <code style={styles.inlineCode}>data/custom-screenshot.png</code> in your repo instead of uploading here.
+                </div>
+              </div>
+            ) : (
+              <label style={styles.uploadRow}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={(e) => { if (e.target.files[0]) handleImageUpload(e.target.files[0]); e.target.value = ""; }}
+                />
+                {imageLoading ? <Icon.spinner size={14} /> : <Icon.upload size={14} />}
+                {imageLoading ? "Reading screenshot…" : "Upload a screenshot of your build"}
+              </label>
+            )}
+            {imageErr && <div style={styles.errText}>{imageErr}</div>}
+          </div>
+
+          {imageModalOpen && (imageTab === "auto" ? autoImage : (repoCustomImage || customImage)) && (
+            <div style={styles.modalBackdrop} onClick={() => setImageModalOpen(false)}>
+              <button style={styles.modalClose} onClick={() => setImageModalOpen(false)} aria-label="Close">
+                ✕
+              </button>
+              <img
+                src={imageTab === "auto" ? autoImage : (repoCustomImage || customImage)}
+                alt="Full-size Keqing build screenshot"
+                style={styles.modalImg}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          )}
+
+          {editingBuild ? (
+            <div>
+              <div style={styles.buildForm}>
+                {BUILD_FIELDS.map((f) => (
+                  <div key={f.key} style={styles.buildField}>
+                    <label style={styles.buildLabel}>{f.label}</label>
+                    <input
+                      type={f.numeric ? "number" : "text"}
+                      step={f.numeric ? "0.1" : undefined}
+                      placeholder={f.placeholder}
+                      value={buildForm[f.key] ?? ""}
+                      onChange={(e) => setBuildForm({ ...buildForm, [f.key]: e.target.value })}
+                      style={styles.input}
+                    />
+                  </div>
+                ))}
+              </div>
+              <button onClick={saveBuild} style={{ ...styles.button, marginTop: 10 }}>
+                <Icon.plus size={14} /> Save build
+              </button>
+            </div>
+          ) : (
+            <div style={styles.buildStatsGrid}>
+              {build.weapon && <BuildStat label="Weapon" value={build.weapon} wide />}
+              {build.artifactSet && <BuildStat label="Artifact set" value={build.artifactSet} wide />}
+              {build.critRate !== "" && build.critRate != null && <BuildStat label="Crit rate" value={`${build.critRate}%`} />}
+              {build.critDmg !== "" && build.critDmg != null && <BuildStat label="Crit DMG" value={`${build.critDmg}%`} />}
+              {build.atk !== "" && build.atk != null && <BuildStat label="ATK" value={Number(build.atk).toLocaleString()} />}
+              {build.dmgBonus !== "" && build.dmgBonus != null && <BuildStat label="DMG bonus" value={`${build.dmgBonus}%`} />}
+              {build.elementalMastery !== "" && build.elementalMastery != null && <BuildStat label="Elemental Mastery" value={Number(build.elementalMastery).toLocaleString()} />}
+              {build.avgDmg !== "" && build.avgDmg != null && <BuildStat label="Avg DMG" value={Number(build.avgDmg).toLocaleString()} />}
+            </div>
+          )}
+        </div>
+
+        <div style={styles.heroGrid}>
+          <div style={styles.ringCard}>
+            <svg width="140" height="140" viewBox="0 0 140 140">
+              <circle cx="70" cy="70" r="54" fill="none" stroke="#2a2246" strokeWidth="10" />
+              <circle
+                cx="70" cy="70" r="54" fill="none" stroke="url(#goldGrad)" strokeWidth="10"
+                strokeDasharray={circumference} strokeDashoffset={circumference * (1 - ringPct / 100)}
+                strokeLinecap="round" transform="rotate(-90 70 70)"
+              />
+              <defs>
+                <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#f2c14e" />
+                  <stop offset="100%" stopColor="#f29e4e" />
+                </linearGradient>
+              </defs>
+              <foreignObject x="20" y="42" width="100" height="56">
+                <div style={{ textAlign: "center", fontFamily: "'Rajdhani',sans-serif" }}>
+                  <div style={{ fontSize: 30, fontWeight: 700, color: "#f2c14e", lineHeight: 1 }}>{stats.currentStreak}</div>
+                  <div style={{ fontSize: 10, letterSpacing: 1, color: "#9a90b8", marginTop: 4 }}>DAY STREAK</div>
+                </div>
+              </foreignObject>
+            </svg>
+            <div style={styles.ringCaption}><Icon.bolt size={12} /> current run at Rank 1</div>
+          </div>
+
+          <div style={styles.statsGrid}>
+            <StatCard label="YTD % at Rank 1" value={`${stats.ytdPercent.toFixed(2)}%`} sub={`${stats.daysAtRank1YTD} of ${stats.daysElapsedYTD} days elapsed in ${stats.currentYear}`} />
+            <StatCard label={`% of ${stats.currentYear} at Rank 1`} value={`${stats.yearPercent.toFixed(2)}%`} sub={`${stats.daysAtRank1YTD} of ${stats.daysInYear} days — running total`} accent />
+            <StatCard label="Total days at Rank 1" value={stats.totalDaysAtRank1} sub="since first reaching #1" />
+            <StatCard label="Days since Feb 2, 2026" value={stats.daysSinceAnchor} sub="anchor date tracked" />
+            <StatCard label={`Days left in ${stats.currentYear}`} value={stats.daysLeftInYear} sub="remaining to keep the streak" />
+            {stats.percentile !== null && (
+              <StatCard label="Percentile" value={`Top ${stats.percentile.toFixed(3)}%`} sub={`#${stats.currentRank} of ${stats.lastKnownTotal.toLocaleString()} players`} />
+            )}
+          </div>
+        </div>
+
+        <div style={styles.panel}>
+          <div style={styles.panelTitle}>Rank history</div>
+          <RankChart points={stats.chartPoints} maxRank={stats.maxRank} />
+        </div>
+
+        <div style={styles.panel}>
+          <div style={styles.panelTitle}>Log a check-in</div>
+          <div style={styles.form}>
+            <input type="date" value={dateInput} max={todayIso()} onChange={(e) => setDateInput(e.target.value)} style={styles.input} />
+            <input type="number" min="1" placeholder="Rank" value={rankInput} onChange={(e) => setRankInput(e.target.value)} style={{ ...styles.input, width: 80 }} />
+            <input type="number" min="1" placeholder="of total (optional)" value={totalInput} onChange={(e) => setTotalInput(e.target.value)} style={{ ...styles.input, width: 130 }} />
+            <input type="text" placeholder="Note (optional)" value={noteInput} onChange={(e) => setNoteInput(e.target.value)} style={{ ...styles.input, flex: 1, minWidth: 140 }} />
+            <button onClick={submit} style={styles.button}><Icon.plus size={14} /> Log</button>
+          </div>
+          {err && <div style={styles.errText}>{err}</div>}
+        </div>
+
+        <div style={styles.panel}>
+          <button onClick={() => setCheckinLogOpen(!checkinLogOpen)} style={styles.collapseHeader}>
+            <span style={{ ...styles.panelTitle, marginBottom: 0 }}>Check-in log</span>
+            <span style={styles.collapseRight}>
+              <span style={styles.collapseCount}>{sorted.length} {sorted.length === 1 ? "entry" : "entries"}</span>
+              <span style={styles.collapseChevron(checkinLogOpen)}>▾</span>
+            </span>
+          </button>
+          {checkinLogOpen && (
+          <div>
+            {sorted.slice().reverse().map((c) => (
+              <div key={c.date} className="checkin-row" style={styles.row}>
+                <span style={styles.rowDate}>{fmtLong(c.date)}</span>
+                <span style={styles.rowRank(c.rank)}>{c.rank === 1 ? <Icon.crown size={12} /> : null} #{c.rank}{c.total ? ` /${c.total.toLocaleString()}` : ""}</span>
+                <span style={styles.rowNote}>{c.note}</span>
+                <button className="del-btn" onClick={() => remove(c.date)} style={styles.delBtn}><Icon.trash size={13} /></button>
+              </div>
+            ))}
+          </div>
+          )}        </div>
+        </>
+        )}
+
+        {activeTab === "top20" && (
+          <>
+          <div style={styles.panel}>
+            <div style={styles.buildHeader}>
+              <div style={styles.panelTitle}>Top 20 — Keqing (TF)</div>
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                <a className="link" style={styles.link} href={BOARD_URL} target="_blank" rel="noopener noreferrer">
+                  View live<Icon.external style={{ marginLeft: 3, marginBottom: -2 }} />
+                </a>
+                {hasSavedTop20 && !editingTop20 && (
+                  <button
+                    onClick={() => { setTop20Form(top20); setEditingTop20(true); }}
+                    style={styles.iconBtn}
+                    aria-label="Edit top 20"
+                  >
+                    <Icon.pencil size={13} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {top20.updatedOn && !editingTop20 && (
+              <div style={styles.top20Updated}>
+                Last updated {fmtLong(top20.updatedOn)} ({daysSinceTop20Update} day{daysSinceTop20Update === 1 ? "" : "s"} ago)
+              </div>
+            )}
+
+            {top20Overdue && !editingTop20 && (
+              <div style={styles.overdueBanner}>
+                <Icon.bolt size={13} /> It's been {daysSinceTop20Update} days since your last check — head to akasha.cv and update your Top 20.
+              </div>
+            )}
+
+            {editingTop20 ? (
+              <div>
+                <div style={styles.top20EditHint}>
+                  Paste in whatever's visible on the leaderboard — nickname and one or two stats are enough. Leave rows blank if you don't have the data.
+                </div>
+                <div style={styles.top20Table}>
+                  <div style={styles.top20HeaderRow}>
+                    <span style={styles.top20ColRank}>#</span>
+                    <span style={styles.top20ColName}>Nickname</span>
+                    <span style={styles.top20ColStat}>Avg DMG</span>
+                    <span style={styles.top20ColStat}>CV</span>
+                  </div>
+                  {top20Form.rows.map((row, i) => (
+                    <div key={row.rank} style={styles.top20EditRow}>
+                      <span style={styles.top20ColRank}>{row.rank}</span>
+                      <input
+                        type="text"
+                        placeholder="nickname"
+                        value={row.nickname}
+                        onChange={(e) => updateTop20Row(i, "nickname", e.target.value)}
+                        style={{ ...styles.input, ...styles.top20InputName }}
+                      />
+                      <input
+                        type="number"
+                        placeholder="—"
+                        value={row.avgDmg}
+                        onChange={(e) => updateTop20Row(i, "avgDmg", e.target.value)}
+                        style={{ ...styles.input, ...styles.top20InputStat }}
+                      />
+                      <input
+                        type="number"
+                        step="0.1"
+                        placeholder="—"
+                        value={row.cv}
+                        onChange={(e) => updateTop20Row(i, "cv", e.target.value)}
+                        style={{ ...styles.input, ...styles.top20InputStat }}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <button onClick={saveTop20} style={{ ...styles.button, marginTop: 12 }}>
+                  <Icon.plus size={14} /> Save Top 20
+                </button>
+              </div>
+            ) : (
+              <>
+              {previousTop20Snapshot && (
+                <div style={styles.changeLegend}>
+                  <span style={styles.changeLegendDot} /> highlighted = changed since {fmtLong(previousTop20Snapshot.updatedOn)}
+                </div>
+              )}
+              <div style={styles.top20Table}>
+                <div style={styles.top20HeaderRow}>
+                  <span style={styles.top20ColRank}>#</span>
+                  <span style={styles.top20ColName}>Nickname</span>
+                  <span style={styles.top20ColStat}>Avg DMG</span>
+                  <span style={styles.top20ColStat}>CV</span>
+                </div>
+                {top20.rows.map((row) => {
+                  const changes = getRowChanges(row);
+                  return (
+                    <div key={row.rank} style={styles.top20Row(row.rank === 1)}>
+                      <span style={changes.rank ? styles.top20ColRankChanged : styles.top20ColRank}>
+                        {row.rank === 1 ? <Icon.crown size={12} style={{ marginRight: 3, marginBottom: -1 }} /> : null}
+                        {row.rank}
+                      </span>
+                      <span style={changes.isNew ? styles.top20ColNameNew : styles.top20ColName}>
+                        {row.nickname || "—"}{changes.isNew ? " (new)" : ""}
+                      </span>
+                      <span style={changes.avgDmg ? styles.top20ColStatChanged : styles.top20ColStat}>
+                        {row.avgDmg != null ? row.avgDmg.toLocaleString() : "—"}
+                      </span>
+                      <span style={changes.cv ? styles.top20ColStatChanged : styles.top20ColStat}>
+                        {row.cv != null ? row.cv.toFixed(1) : "—"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              </>
+            )}
+          </div>
+
+          <div style={styles.panel}>
+            <button onClick={() => setSnapshotHistoryOpen(!snapshotHistoryOpen)} style={styles.collapseHeader}>
+              <span style={{ ...styles.panelTitle, marginBottom: 0 }}>Snapshot history</span>
+              <span style={styles.collapseRight}>
+                <span style={styles.collapseCount}>
+                  {top20History.length <= 1 ? "no earlier snapshots" : `${top20History.length} snapshots`}
+                </span>
+                <span style={styles.collapseChevron(snapshotHistoryOpen)}>▾</span>
+              </span>
+            </button>
+            {snapshotHistoryOpen && (
+            top20History.length <= 1 ? (
+              <div style={styles.top20EditHint}>
+                No earlier snapshots yet — the next time you update the Top 20, this one gets archived here so you can compare over time.
+              </div>
+            ) : (
+              <div>
+                {top20History.map((h) => (
+                  <div key={h.updatedOn}>
+                    <button
+                      onClick={() => setExpandedHistoryDate(expandedHistoryDate === h.updatedOn ? null : h.updatedOn)}
+                      style={styles.historyDateBtn}
+                    >
+                      <span>{fmtLong(h.updatedOn)}</span>
+                      <span style={styles.historyDateSub}>
+                        {h.rows[0] ? `#1 ${h.rows[0].nickname || "—"} · ${h.rows[0].avgDmg != null ? h.rows[0].avgDmg.toLocaleString() : "—"} dmg` : ""}
+                        {" "}{expandedHistoryDate === h.updatedOn ? "▲" : "▼"}
+                      </span>
+                    </button>
+                    {expandedHistoryDate === h.updatedOn && (
+                      <div style={styles.top20Table}>
+                        <div style={styles.top20HeaderRow}>
+                          <span style={styles.top20ColRank}>#</span>
+                          <span style={styles.top20ColName}>Nickname</span>
+                          <span style={styles.top20ColStat}>Avg DMG</span>
+                          <span style={styles.top20ColStat}>CV</span>
+                        </div>
+                        {h.rows.map((row) => (
+                          <div key={row.rank} style={styles.top20Row(row.rank === 1)}>
+                            <span style={styles.top20ColRank}>
+                              {row.rank === 1 ? <Icon.crown size={12} style={{ marginRight: 3, marginBottom: -1 }} /> : null}
+                              {row.rank}
+                            </span>
+                            <span style={styles.top20ColName}>{row.nickname || "—"}</span>
+                            <span style={styles.top20ColStat}>{row.avgDmg != null ? row.avgDmg.toLocaleString() : "—"}</span>
+                            <span style={styles.top20ColStat}>{row.cv != null ? row.cv.toFixed(1) : "—"}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )
+            )}
+          </div>
+          </>
+        )}
+
+        <div style={styles.footer}>
+          Source of truth:{" "}
+          <a className="link" style={styles.link} href={BOARD_URL} target="_blank" rel="noopener noreferrer">akasha.cv</a>
+          {" "}— log check-ins here whenever you look it up.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RankChart({ points, maxRank }) {
+  const W = 640, H = 200, padL = 30, padR = 16, padT = 12, padB = 24;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+  const n = points.length;
+  const x = (i) => padL + (n <= 1 ? innerW / 2 : (innerW * i) / (n - 1));
+  const y = (rank) => padT + ((rank - 1) / (maxRank - 1 || 1)) * innerH;
+
+  let path = "";
+  points.forEach((p, i) => {
+    const px = x(i);
+    const py = y(p.rank);
+    if (i === 0) {
+      path += `M ${px} ${py}`;
+    } else {
+      const prevY = y(points[i - 1].rank);
+      path += ` L ${px} ${prevY} L ${px} ${py}`;
+    }
+  });
+
+  const rank1Y = y(1);
+  const labelStep = Math.max(1, Math.ceil(n / 6));
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
+      <line x1={padL} y1={rank1Y} x2={W - padR} y2={rank1Y} stroke="#f2c14e" strokeDasharray="4 4" strokeWidth="1" />
+      {Array.from({ length: maxRank }, (_, i) => i + 1).map((r) => (
+        <line key={r} x1={padL} y1={y(r)} x2={W - padR} y2={y(r)} stroke="#2a2246" strokeWidth="1" strokeDasharray="2 3" />
+      ))}
+      <path d={path} fill="none" stroke="#8b5cf6" strokeWidth="2.5" strokeLinejoin="round" />
+      {points.map((p, i) => (
+        <circle key={p.date} cx={x(i)} cy={y(p.rank)} r={i === n - 1 ? 4 : 3} fill="#8b5cf6" stroke="#0e0b1f" strokeWidth="1.5" />
+      ))}
+      {points.map((p, i) => (
+        (i % labelStep === 0 || i === n - 1) && (
+          <text key={p.date} x={x(i)} y={H - 6} fontSize="10" fill="#6b6289" textAnchor="middle" fontFamily="Inter">
+            {fmtShort(p.date)}
+          </text>
+        )
+      ))}
+      {Array.from({ length: maxRank }, (_, i) => i + 1).map((r) => (
+        <text key={r} x={padL - 6} y={y(r) + 3} fontSize="10" fill="#6b6289" textAnchor="end" fontFamily="Inter">{r}</text>
+      ))}
+    </svg>
+  );
+}
+
+function BuildStat({ label, value, accent, wide }) {
+  return (
+    <div style={styles.buildStat(accent, wide)}>
+      <div style={styles.statLabel}>{label}</div>
+      <div style={wide ? styles.statValueText : styles.statValue(accent)}>{value}</div>
+    </div>
+  );
+}
+
+function StatCard({ label, value, sub, accent }) {
+  return (
+    <div style={styles.statCard(accent)}>
+      <div style={styles.statLabel}>{label}</div>
+      <div style={styles.statValue(accent)}>{value}</div>
+      <div style={styles.statSub}>{sub}</div>
+    </div>
+  );
+}
+
+const DIAMOND_PATTERN =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='84' height='84'><g fill='none' stroke='#395b64' stroke-width='1' opacity='0.35'>` +
+      `<path d='M42 4 L78 42 L42 80 L6 42 Z'/><path d='M42 20 L62 42 L42 64 L22 42 Z'/>` +
+    `</g></svg>`
+  );
+
+const styles = {
+  lockPage: {
+    background: `linear-gradient(180deg,#0e0b1f 0%,#120e24 100%), url("${DIAMOND_PATTERN}")`,
+    backgroundBlendMode: "normal, soft-light",
+    backgroundSize: "auto, 84px 84px",
+    minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
+    fontFamily: "'Inter',sans-serif", padding: 20,
+  },
+  lockCard: {
+    display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center",
+    background: "#151027", border: "1px solid #241c3f", borderRadius: 20,
+    padding: "36px 32px", maxWidth: 320, width: "100%",
+  },
+  lockTitle: { fontFamily: "'Rajdhani',sans-serif", fontSize: 26, fontWeight: 700, color: "#f3f0fb", margin: "10px 0 2px" },
+  lockSub: { fontSize: 12.5, color: "#9a90b8", marginBottom: 18 },
+  lockInput: {
+    width: "100%", textAlign: "center", letterSpacing: 6, fontSize: 20,
+    background: "#0e0b1f", border: "1px solid #362a5c", borderRadius: 10,
+    padding: "10px 12px", color: "#e8e3f5", outline: "none", fontFamily: "'JetBrains Mono',monospace",
+  },
+  unlockAnimWrap: {
+    position: "relative", width: 200, height: 200,
+    display: "flex", alignItems: "center", justifyContent: "center",
+  },
+  unlockGlow: {
+    position: "absolute", width: 60, height: 60, borderRadius: "50%",
+    background: "radial-gradient(circle, rgba(242,193,78,0.55) 0%, rgba(139,92,246,0.35) 55%, transparent 75%)",
+  },
+  unlockSpark: {
+    position: "absolute", width: 6, height: 6, borderRadius: "50%",
+    background: "#f2c14e", boxShadow: "0 0 8px 2px rgba(242,193,78,0.7)",
+  },
+  unlockText: {
+    position: "absolute", bottom: -6, fontFamily: "'Rajdhani',sans-serif", fontSize: 15,
+    fontWeight: 700, letterSpacing: 1, color: "#f2c14e",
+  },
+  page: {
+    background: `linear-gradient(180deg,#0e0b1f 0%,#120e24 100%), url("${DIAMOND_PATTERN}")`,
+    backgroundBlendMode: "normal, soft-light",
+    backgroundSize: "auto, 84px 84px",
+    minHeight: "100vh", padding: "28px 16px", fontFamily: "'Inter',sans-serif",
+  },
+  container: { maxWidth: 720, margin: "0 auto", display: "flex", flexDirection: "column", gap: 18 },
+  syncBanner: {
+    display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "#9a90b8",
+    background: "#181330", border: "1px solid #2a2246", borderRadius: 8, padding: "6px 10px", width: "fit-content",
+  },
+  siteStrip: {
+    display: "flex", alignItems: "center", gap: 8, fontFamily: "'JetBrains Mono',monospace",
+    fontSize: 11, letterSpacing: 0.5, color: "#7fa8b0", background: "rgba(57,91,100,0.18)",
+    border: "1px solid rgba(57,91,100,0.5)", borderRadius: 999, padding: "5px 12px", width: "fit-content",
+  },
+  siteStripDot: { width: 6, height: 6, borderRadius: "50%", background: "#5dcaa5", display: "inline-block" },
+  autoSyncBadge: {
+    display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#c9b6ff",
+    background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.4)",
+    borderRadius: 999, padding: "5px 12px", width: "fit-content",
+  },
+  syncBtn: {
+    display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#9a90b8",
+    background: "#181330", border: "1px solid #2a2246", borderRadius: 999,
+    padding: "5px 12px", cursor: "pointer", fontFamily: "'Inter',sans-serif",
+  },
+  header: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 },
+  eyebrow: {
+    display: "flex", alignItems: "center", gap: 6,
+    fontFamily: "'Rajdhani',sans-serif", fontSize: 12, letterSpacing: 2, color: "#8b5cf6", fontWeight: 600,
+  },
+  h1: { fontFamily: "'Rajdhani',sans-serif", fontSize: 34, fontWeight: 700, color: "#f3f0fb", margin: "2px 0 4px" },
+  subtext: { fontSize: 13, color: "#9a90b8" },
+  link: { color: "#b9a8f5", textDecoration: "none", display: "inline-flex", alignItems: "center" },
+  currentBadge: (rank) => ({
+    display: "flex", alignItems: "center", gap: 6, fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, letterSpacing: 1,
+    fontSize: 14, padding: "8px 14px", borderRadius: 999,
+    background: rank === 1 ? "linear-gradient(135deg,#f2c14e,#f29e4e)" : "#241c3f",
+    color: rank === 1 ? "#241205" : "#c9c0e6", height: "fit-content",
+  }),
+  heroGrid: { display: "flex", gap: 16, flexWrap: "wrap" },
+  ringCard: {
+    background: "#181330", border: "1px solid #2a2246", borderRadius: 16, padding: "16px 20px",
+    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minWidth: 172,
+  },
+  ringCaption: { fontSize: 11, color: "#9a90b8", marginTop: 6, display: "flex", alignItems: "center", gap: 4 },
+  statsGrid: { flex: 1, minWidth: 260, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
+  statCard: (accent) => ({
+    background: accent ? "linear-gradient(135deg,#241c3f,#2c2050)" : "#181330",
+    border: accent ? "1px solid #4c3a8a" : "1px solid #2a2246",
+    borderRadius: 14, padding: "14px 16px",
+  }),
+  statLabel: { fontSize: 11, color: "#9a90b8", letterSpacing: 0.3 },
+  statValue: (accent) => ({ fontFamily: "'Rajdhani',sans-serif", fontSize: 26, fontWeight: 700, color: accent ? "#c9b6ff" : "#f3f0fb", margin: "2px 0", overflowWrap: "break-word" }),
+  statSub: { fontSize: 10.5, color: "#6b6289" },
+  panel: { background: "#151027", border: "1px solid #241c3f", borderRadius: 16, padding: "18px 20px" },
+  panelTitle: { fontFamily: "'Rajdhani',sans-serif", fontSize: 15, fontWeight: 600, color: "#e8e3f5", marginBottom: 12, letterSpacing: 0.5 },
+  collapseHeader: {
+    display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%",
+    background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: 4,
+  },
+  collapseRight: { display: "flex", alignItems: "center", gap: 8 },
+  collapseCount: { fontSize: 11, color: "#6b6289", fontFamily: "'Inter',sans-serif" },
+  collapseChevron: (open) => ({
+    display: "inline-block", color: "#9a90b8", fontSize: 14,
+    transform: open ? "rotate(180deg)" : "rotate(0deg)",
+    transition: "transform 0.15s ease",
+  }),
+  buildHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  iconBtn: {
+    background: "none", border: "1px solid #362a5c", borderRadius: 6, color: "#9a90b8",
+    cursor: "pointer", padding: "4px 6px", display: "flex", alignItems: "center",
+  },
+  uploadRow: {
+    display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "#c9b6ff",
+    background: "rgba(139,92,246,0.12)", border: "1px dashed #4c3a8a", borderRadius: 8,
+    padding: "8px 12px", cursor: "pointer", marginBottom: 12,
+  },
+  screenshotBlock: { marginBottom: 14 },
+  imageTabBar: { display: "flex", gap: 6, marginBottom: 10 },
+  imageTabBtn: (active) => ({
+    fontFamily: "'Inter',sans-serif", fontWeight: 600, fontSize: 11.5,
+    padding: "5px 12px", borderRadius: 999, cursor: "pointer",
+    background: active ? "linear-gradient(135deg,#8b5cf6,#6d4bc9)" : "#181330",
+    color: active ? "#f3f0fb" : "#9a90b8",
+    border: active ? "1px solid #8b5cf6" : "1px solid #2a2246",
+  }),
+  autoImagePlaceholder: {
+    fontSize: 12, color: "#9a90b8", lineHeight: 1.5, background: "#181330",
+    border: "1px dashed #2a2246", borderRadius: 8, padding: "12px 14px",
+  },
+  repoImageNote: {
+    fontSize: 11, color: "#6b6289", marginTop: 8, lineHeight: 1.5,
+  },
+  inlineCode: {
+    fontFamily: "'JetBrains Mono',monospace", background: "#181330", color: "#c9b6ff",
+    padding: "1px 5px", borderRadius: 4, fontSize: 10.5,
+  },
+  screenshotBtn: {
+    display: "block", padding: 0, margin: 0, background: "none", border: "none", cursor: "pointer",
+    width: "100%", maxWidth: 560, textAlign: "left",
+  },
+  screenshotImg: { width: "100%", maxWidth: 560, borderRadius: 12, border: "1px solid #2a2246", display: "block" },
+  screenshotHint: { fontSize: 11, color: "#6b6289", marginTop: 6 },
+  screenshotActions: { display: "flex", gap: 8, marginTop: 8 },
+  modalBackdrop: {
+    position: "fixed", inset: 0, background: "rgba(8,6,18,0.92)", zIndex: 1000,
+    display: "flex", alignItems: "center", justifyContent: "center", padding: 24, cursor: "zoom-out",
+  },
+  modalImg: {
+    maxWidth: "92vw", maxHeight: "92vh", borderRadius: 8, boxShadow: "0 0 0 1px #362a5c", cursor: "default",
+  },
+  modalClose: {
+    position: "fixed", top: 16, right: 20, zIndex: 1001, background: "#181330", border: "1px solid #362a5c",
+    color: "#e8e3f5", borderRadius: 8, width: 36, height: 36, fontSize: 16, cursor: "pointer",
+  },
+  smallUploadBtn: {
+    display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, color: "#c9c0e6",
+    background: "#1a1530", border: "1px solid #362a5c", borderRadius: 6, padding: "5px 10px", cursor: "pointer",
+  },
+  buildForm: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 10 },
+  buildField: { display: "flex", flexDirection: "column", gap: 4 },
+  buildLabel: { fontSize: 11, color: "#9a90b8" },
+  buildStatsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(110px,1fr))", gap: 10 },
+  buildStat: (accent, wide) => ({
+    background: accent ? "linear-gradient(135deg,#241c3f,#2c2050)" : "#181330",
+    border: accent ? "1px solid #4c3a8a" : "1px solid #2a2246",
+    borderRadius: 12, padding: "10px 12px",
+    gridColumn: wide ? "span 2" : undefined,
+    minWidth: 0,
+  }),
+  statValueText: {
+    fontFamily: "'Rajdhani',sans-serif", fontSize: 16, fontWeight: 600, color: "#f3f0fb", margin: "2px 0",
+    overflowWrap: "break-word", wordBreak: "break-word", whiteSpace: "normal", lineHeight: 1.25,
+  },
+  form: { display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" },
+  input: {
+    background: "#0e0b1f", border: "1px solid #362a5c", borderRadius: 8, padding: "8px 10px",
+    color: "#e8e3f5", fontSize: 13, outline: "none",
+  },
+  button: {
+    display: "flex", alignItems: "center", gap: 6, background: "#8b5cf6", color: "#100b22", border: "none",
+    borderRadius: 8, padding: "9px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer",
+  },
+  errText: { color: "#ef4670", fontSize: 12, marginTop: 8 },
+  row: {
+    display: "flex", alignItems: "center", gap: 14, padding: "9px 6px", borderRadius: 8,
+    borderBottom: "1px solid #201a38", fontSize: 13,
+  },
+  rowDate: { color: "#c9c0e6", fontFamily: "'JetBrains Mono',monospace", fontSize: 12, width: 110, flexShrink: 0 },
+  rowRank: (rank) => ({
+    display: "flex", alignItems: "center", gap: 4, fontFamily: "'Rajdhani',sans-serif", fontWeight: 700,
+    color: rank === 1 ? "#f2c14e" : "#9a90b8", width: 100, flexShrink: 0,
+  }),
+  rowNote: { color: "#8078a0", flex: 1, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  delBtn: { background: "none", border: "none", color: "#6b6289", cursor: "pointer", padding: 4 },
+  footer: { fontSize: 11.5, color: "#5a5278", textAlign: "center", paddingTop: 4 },
+
+  tabBar: { display: "flex", gap: 8 },
+  tabBtn: (active) => ({
+    fontFamily: "'Rajdhani',sans-serif", fontWeight: 600, fontSize: 13.5, letterSpacing: 0.5,
+    padding: "8px 18px", borderRadius: 999, cursor: "pointer",
+    background: active ? "linear-gradient(135deg,#8b5cf6,#6d4bc9)" : "#181330",
+    color: active ? "#f3f0fb" : "#9a90b8",
+    border: active ? "1px solid #8b5cf6" : "1px solid #2a2246",
+  }),
+  top20Updated: { fontSize: 11.5, color: "#6b6289", marginBottom: 10 },
+  top20EditHint: { fontSize: 12, color: "#9a90b8", marginBottom: 12, lineHeight: 1.5 },
+  top20Table: { display: "flex", flexDirection: "column" },
+  top20HeaderRow: {
+    display: "flex", alignItems: "center", gap: 10, padding: "0 6px 8px",
+    fontSize: 10.5, letterSpacing: 0.5, color: "#6b6289", textTransform: "uppercase",
+    borderBottom: "1px solid #241c3f",
+  },
+  top20Row: (isFirst) => ({
+    display: "flex", alignItems: "center", gap: 10, padding: "8px 6px",
+    borderBottom: "1px solid #201a38", fontSize: 13,
+    background: isFirst ? "rgba(242,193,78,0.08)" : "transparent",
+  }),
+  top20EditRow: { display: "flex", alignItems: "center", gap: 10, padding: "5px 0" },
+  top20ColRank: {
+    width: 26, flexShrink: 0, fontFamily: "'Rajdhani',sans-serif", fontWeight: 700,
+    color: "#c9c0e6", display: "flex", alignItems: "center",
+  },
+  top20ColRankChanged: {
+    width: 26, flexShrink: 0, fontFamily: "'Rajdhani',sans-serif", fontWeight: 700,
+    color: "#f2c14e", display: "flex", alignItems: "center",
+    background: "rgba(242,193,78,0.15)", borderRadius: 4, padding: "1px 3px", margin: "-1px -3px",
+  },
+  top20ColName: { flex: 1, color: "#e8e3f5", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  top20ColNameNew: {
+    flex: 1, color: "#8b5cf6", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+  },
+  top20ColStat: { width: 88, flexShrink: 0, color: "#9a90b8", fontFamily: "'JetBrains Mono',monospace", fontSize: 12.5, textAlign: "right" },
+  top20ColStatChanged: {
+    width: 88, flexShrink: 0, color: "#f2c14e", fontFamily: "'JetBrains Mono',monospace", fontSize: 12.5, textAlign: "right",
+    background: "rgba(242,193,78,0.15)", borderRadius: 4, padding: "1px 3px", margin: "-1px -3px",
+  },
+  changeLegend: {
+    display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#9a90b8", marginBottom: 10,
+  },
+  changeLegendDot: {
+    width: 10, height: 10, borderRadius: 3, background: "rgba(242,193,78,0.35)", border: "1px solid rgba(242,193,78,0.6)",
+    display: "inline-block",
+  },
+  top20InputName: { flex: 1, width: "auto" },
+  top20InputStat: { width: 88, flexShrink: 0, textAlign: "right" },
+  overdueBanner: {
+    display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#f2c14e",
+    background: "rgba(242,193,78,0.1)", border: "1px solid rgba(242,193,78,0.35)",
+    borderRadius: 8, padding: "8px 12px", marginBottom: 12,
+  },
+  historyDateBtn: {
+    display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%",
+    background: "none", border: "none", borderBottom: "1px solid #201a38", cursor: "pointer",
+    padding: "10px 4px", fontSize: 13, color: "#e8e3f5", textAlign: "left",
+    fontFamily: "'JetBrains Mono',monospace",
+  },
+  historyDateSub: { color: "#9a90b8", fontSize: 11.5, fontFamily: "'Inter',sans-serif" },
+};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<RankTracker />);
+</script>
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(() => {
+        // offline/install support just won't be available — the app still works
+      });
+    });
+  }
+</script>
+</body>
+</html>
