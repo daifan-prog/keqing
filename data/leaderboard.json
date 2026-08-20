@@ -1,6 +1,6 @@
 {
-  "updatedOn": "2026-08-19",
-  "fetchedAt": "2026-08-19T10:04:04.576Z",
+  "updatedOn": "2026-08-20",
+  "fetchedAt": "2026-08-20T10:05:24.371Z",
   "totalPlayers": 162768,
   "trackedRank": 1,
   "build": {
@@ -14,7 +14,7 @@
     "avgDmg": 595809
   },
   "top20": {
-    "updatedOn": "2026-08-19",
+    "updatedOn": "2026-08-20",
     "rows": [
       {
         "rank": 1,
@@ -60,85 +60,210 @@
       },
       {
         "rank": 8,
-        "nickname": "˚ʚ라임ɞ˚",
-        "avgDmg": 585380,
-        "cv": 272.1
+        "nickname": "轲南",
+        "avgDmg": 585064,
+        "cv": 275.2
       },
       {
         "rank": 9,
+        "nickname": "˚ʚ라임ɞ˚",
+        "avgDmg": 584660,
+        "cv": 267.4
+      },
+      {
+        "rank": 10,
         "nickname": "ArchedNosi",
         "avgDmg": 584381,
         "cv": 283.7
       },
       {
-        "rank": 10,
+        "rank": 11,
         "nickname": "まぐ",
         "avgDmg": 584253,
         "cv": 259.6
       },
       {
-        "rank": 11,
+        "rank": 12,
+        "nickname": "Yuki",
+        "avgDmg": 584183,
+        "cv": 265.9
+      },
+      {
+        "rank": 13,
         "nickname": "青空夜空",
         "avgDmg": 583192,
         "cv": 269.7
       },
       {
-        "rank": 12,
+        "rank": 14,
         "nickname": "Tobit",
         "avgDmg": 582193,
         "cv": 260.5
       },
       {
-        "rank": 13,
-        "nickname": "Yuki",
-        "avgDmg": 581097,
-        "cv": 272.9
-      },
-      {
-        "rank": 14,
+        "rank": 15,
         "nickname": "ベロ",
         "avgDmg": 580805,
         "cv": 265.1
       },
       {
-        "rank": 15,
+        "rank": 16,
         "nickname": "take",
         "avgDmg": 580498,
         "cv": 277.5
       },
       {
-        "rank": 16,
+        "rank": 17,
         "nickname": "紫色电电猫",
         "avgDmg": 579782,
         "cv": 282.1
       },
       {
-        "rank": 17,
+        "rank": 18,
         "nickname": "Rena",
         "avgDmg": 579469,
         "cv": 283
       },
       {
-        "rank": 18,
+        "rank": 19,
         "nickname": "Shinory",
         "avgDmg": 578831,
         "cv": 267.4
       },
       {
-        "rank": 19,
+        "rank": 20,
         "nickname": "いであ",
         "avgDmg": 577638,
         "cv": 257.4
-      },
-      {
-        "rank": 20,
-        "nickname": "Firesnake",
-        "avgDmg": 577580,
-        "cv": 281.4
       }
     ]
   },
   "top20History": [
+    {
+      "updatedOn": "2026-08-20",
+      "rows": [
+        {
+          "rank": 1,
+          "nickname": "GH",
+          "avgDmg": 595809,
+          "cv": 281.4
+        },
+        {
+          "rank": 2,
+          "nickname": "沐悠甘青",
+          "avgDmg": 595049,
+          "cv": 268.2
+        },
+        {
+          "rank": 3,
+          "nickname": "HX386",
+          "avgDmg": 592440,
+          "cv": 272.1
+        },
+        {
+          "rank": 4,
+          "nickname": "ゼロ",
+          "avgDmg": 590236,
+          "cv": 263.5
+        },
+        {
+          "rank": 5,
+          "nickname": "冷酷、晴姐",
+          "avgDmg": 588426,
+          "cv": 293.1
+        },
+        {
+          "rank": 6,
+          "nickname": "kazoo",
+          "avgDmg": 586935,
+          "cv": 274.4
+        },
+        {
+          "rank": 7,
+          "nickname": "Cuwei",
+          "avgDmg": 586464,
+          "cv": 287.6
+        },
+        {
+          "rank": 8,
+          "nickname": "轲南",
+          "avgDmg": 585064,
+          "cv": 275.2
+        },
+        {
+          "rank": 9,
+          "nickname": "˚ʚ라임ɞ˚",
+          "avgDmg": 584660,
+          "cv": 267.4
+        },
+        {
+          "rank": 10,
+          "nickname": "ArchedNosi",
+          "avgDmg": 584381,
+          "cv": 283.7
+        },
+        {
+          "rank": 11,
+          "nickname": "まぐ",
+          "avgDmg": 584253,
+          "cv": 259.6
+        },
+        {
+          "rank": 12,
+          "nickname": "Yuki",
+          "avgDmg": 584183,
+          "cv": 265.9
+        },
+        {
+          "rank": 13,
+          "nickname": "青空夜空",
+          "avgDmg": 583192,
+          "cv": 269.7
+        },
+        {
+          "rank": 14,
+          "nickname": "Tobit",
+          "avgDmg": 582193,
+          "cv": 260.5
+        },
+        {
+          "rank": 15,
+          "nickname": "ベロ",
+          "avgDmg": 580805,
+          "cv": 265.1
+        },
+        {
+          "rank": 16,
+          "nickname": "take",
+          "avgDmg": 580498,
+          "cv": 277.5
+        },
+        {
+          "rank": 17,
+          "nickname": "紫色电电猫",
+          "avgDmg": 579782,
+          "cv": 282.1
+        },
+        {
+          "rank": 18,
+          "nickname": "Rena",
+          "avgDmg": 579469,
+          "cv": 283
+        },
+        {
+          "rank": 19,
+          "nickname": "Shinory",
+          "avgDmg": 578831,
+          "cv": 267.4
+        },
+        {
+          "rank": 20,
+          "nickname": "いであ",
+          "avgDmg": 577638,
+          "cv": 257.4
+        }
+      ]
+    },
     {
       "updatedOn": "2026-08-19",
       "rows": [
@@ -566,6 +691,12 @@
     },
     {
       "date": "2026-08-19",
+      "rank": 1,
+      "total": 162768,
+      "note": "Auto-synced from akasha.cv"
+    },
+    {
+      "date": "2026-08-20",
       "rank": 1,
       "total": 162768,
       "note": "Auto-synced from akasha.cv"
