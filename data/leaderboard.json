@@ -1,6 +1,6 @@
 {
-  "updatedOn": "2026-08-30",
-  "fetchedAt": "2026-08-30T14:14:42.939Z",
+  "updatedOn": "2026-08-31",
+  "fetchedAt": "2026-08-31T16:39:00.706Z",
   "totalPlayers": 162768,
   "trackedRank": 1,
   "build": {
@@ -14,7 +14,7 @@
     "avgDmg": 595809
   },
   "top20": {
-    "updatedOn": "2026-08-30",
+    "updatedOn": "2026-08-31",
     "rows": [
       {
         "rank": 1,
@@ -48,33 +48,33 @@
       },
       {
         "rank": 6,
+        "nickname": "ArchedNosi",
+        "avgDmg": 587474,
+        "cv": 284.5
+      },
+      {
+        "rank": 7,
         "nickname": "kazoo",
         "avgDmg": 586935,
         "cv": 274.4
       },
       {
-        "rank": 7,
+        "rank": 8,
         "nickname": "Cuwei",
         "avgDmg": 586464,
         "cv": 287.6
       },
       {
-        "rank": 8,
+        "rank": 9,
         "nickname": "轲南",
         "avgDmg": 585064,
         "cv": 275.2
       },
       {
-        "rank": 9,
+        "rank": 10,
         "nickname": "˚ʚ라임ɞ˚",
         "avgDmg": 584660,
         "cv": 267.4
-      },
-      {
-        "rank": 10,
-        "nickname": "ArchedNosi",
-        "avgDmg": 584381,
-        "cv": 283.7
       },
       {
         "rank": 11,
@@ -139,6 +139,131 @@
     ]
   },
   "top20History": [
+    {
+      "updatedOn": "2026-08-31",
+      "rows": [
+        {
+          "rank": 1,
+          "nickname": "GH",
+          "avgDmg": 595809,
+          "cv": 281.4
+        },
+        {
+          "rank": 2,
+          "nickname": "沐悠甘青",
+          "avgDmg": 595049,
+          "cv": 268.2
+        },
+        {
+          "rank": 3,
+          "nickname": "HX386",
+          "avgDmg": 592440,
+          "cv": 272.1
+        },
+        {
+          "rank": 4,
+          "nickname": "ゼロ",
+          "avgDmg": 590236,
+          "cv": 263.5
+        },
+        {
+          "rank": 5,
+          "nickname": "冷酷、晴姐",
+          "avgDmg": 588426,
+          "cv": 293.1
+        },
+        {
+          "rank": 6,
+          "nickname": "ArchedNosi",
+          "avgDmg": 587474,
+          "cv": 284.5
+        },
+        {
+          "rank": 7,
+          "nickname": "kazoo",
+          "avgDmg": 586935,
+          "cv": 274.4
+        },
+        {
+          "rank": 8,
+          "nickname": "Cuwei",
+          "avgDmg": 586464,
+          "cv": 287.6
+        },
+        {
+          "rank": 9,
+          "nickname": "轲南",
+          "avgDmg": 585064,
+          "cv": 275.2
+        },
+        {
+          "rank": 10,
+          "nickname": "˚ʚ라임ɞ˚",
+          "avgDmg": 584660,
+          "cv": 267.4
+        },
+        {
+          "rank": 11,
+          "nickname": "まぐ",
+          "avgDmg": 584253,
+          "cv": 259.6
+        },
+        {
+          "rank": 12,
+          "nickname": "Yuki",
+          "avgDmg": 584183,
+          "cv": 265.9
+        },
+        {
+          "rank": 13,
+          "nickname": "青空夜空",
+          "avgDmg": 583192,
+          "cv": 269.7
+        },
+        {
+          "rank": 14,
+          "nickname": "Shinory",
+          "avgDmg": 582479,
+          "cv": 264.3
+        },
+        {
+          "rank": 15,
+          "nickname": "Tobit",
+          "avgDmg": 582193,
+          "cv": 260.5
+        },
+        {
+          "rank": 16,
+          "nickname": "ベロ",
+          "avgDmg": 580805,
+          "cv": 265.1
+        },
+        {
+          "rank": 17,
+          "nickname": "take",
+          "avgDmg": 580498,
+          "cv": 277.5
+        },
+        {
+          "rank": 18,
+          "nickname": "紫色电电猫",
+          "avgDmg": 579782,
+          "cv": 282.1
+        },
+        {
+          "rank": 19,
+          "nickname": "厳選脳もろこし",
+          "avgDmg": 579629,
+          "cv": 268.2
+        },
+        {
+          "rank": 20,
+          "nickname": "Rena",
+          "avgDmg": 579469,
+          "cv": 283
+        }
+      ]
+    },
     {
       "updatedOn": "2026-08-28",
       "rows": [
@@ -1132,6 +1257,12 @@
     },
     {
       "date": "2026-08-30",
+      "rank": 1,
+      "total": 162768,
+      "note": "Auto-synced from akasha.cv"
+    },
+    {
+      "date": "2026-08-31",
       "rank": 1,
       "total": 162768,
       "note": "Auto-synced from akasha.cv"
