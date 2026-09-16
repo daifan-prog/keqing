@@ -1,6 +1,6 @@
 {
-  "updatedOn": "2026-09-15",
-  "fetchedAt": "2026-09-15T14:06:33.280Z",
+  "updatedOn": "2026-09-16",
+  "fetchedAt": "2026-09-16T13:59:07.276Z",
   "totalPlayers": 162768,
   "trackedRank": 1,
   "build": {
@@ -14,7 +14,7 @@
     "avgDmg": 595809
   },
   "top20": {
-    "updatedOn": "2026-09-15",
+    "updatedOn": "2026-09-16",
     "rows": [
       {
         "rank": 1,
@@ -1353,6 +1353,12 @@
     },
     {
       "date": "2026-09-15",
+      "rank": 1,
+      "total": 162768,
+      "note": "Auto-synced from akasha.cv"
+    },
+    {
+      "date": "2026-09-16",
       "rank": 1,
       "total": 162768,
       "note": "Auto-synced from akasha.cv"
