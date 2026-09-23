@@ -289,12 +289,24 @@ function RankTracker() {
               return merged;
             });
           }
-          saveJSON(TOP20_KEY, data.top20);
-          return data.top20;
+          // only overwrite local with server data if the server's is newer —
+          // if the user manually edited the Top 20 on this device for the
+          // same date (or a more recent one), their edit wins
+          if (!prevTop20.updatedOn || data.top20.updatedOn > prevTop20.updatedOn) {
+            saveJSON(TOP20_KEY, data.top20);
+            return data.top20;
+          }
+          return prevTop20;
         });
-        setTop20Form(data.top20);
-        setHasSavedTop20(true);
-        setEditingTop20(false);
+        // only update the form/editing state if server data is newer than local
+        setTop20((current) => {
+          if (current === data.top20) {
+            setTop20Form(data.top20);
+            setHasSavedTop20(true);
+            setEditingTop20(false);
+          }
+          return current;
+        });
       }
 
       if (Array.isArray(data.top20History) && data.top20History.length > 0) {
@@ -314,25 +326,54 @@ function RankTracker() {
       }
 
       if (data.build) {
-        setBuild(data.build);
-        setBuildForm(data.build);
-        setHasSavedBuild(true);
-        setEditingBuild(false);
-        saveJSON(BUILD_KEY, data.build);
+        setBuild((prevBuild) => {
+          // only overwrite if the server has genuinely different data —
+          // if the user manually edited build stats on this device, their
+          // edit wins until the server's next real change
+          if (JSON.stringify(prevBuild) === JSON.stringify(data.build)) return prevBuild;
+          // check if local has manual fields the server doesn't
+          const localHasExtras = Object.keys(prevBuild || {}).some(
+            (k) => prevBuild[k] != null && prevBuild[k] !== "" && (data.build[k] == null || data.build[k] === "")
+          );
+          if (localHasExtras) return prevBuild;
+          setBuildForm(data.build);
+          setHasSavedBuild(true);
+          setEditingBuild(false);
+          saveJSON(BUILD_KEY, data.build);
+          return data.build;
+        });
       }
 
       if (Array.isArray(data.checkins) && data.checkins.length > 0) {
         // the automation now maintains the FULL check-in log itself (same
         // treatment as top20History) — committed to the repo, so every
         // device sees the same log instead of each browser only ever
-        // knowing about "today". Merge in any local-only manual entries
-        // that aren't part of the server's auto-synced set.
+        // knowing about "today". Merge with local entries, preferring
+        // whichever has more complete data for any given date (so a manual
+        // check-in where you typed in a real total isn't overwritten by
+        // the server's auto-synced entry with total=null).
         setCheckins((prevCheckins) => {
-          const serverDates = new Set(data.checkins.map((c) => c.date));
-          const localOnly = prevCheckins.filter((c) => !serverDates.has(c.date));
-          const merged = data.checkins
-            .concat(localOnly)
-            .sort((a, b) => (a.date < b.date ? -1 : 1));
+          const serverByDate = {};
+          for (const c of data.checkins) serverByDate[c.date] = c;
+          const localByDate = {};
+          for (const c of prevCheckins) localByDate[c.date] = c;
+
+          const allDates = new Set([...Object.keys(serverByDate), ...Object.keys(localByDate)]);
+          const merged = [];
+          for (const date of allDates) {
+            const s = serverByDate[date];
+            const l = localByDate[date];
+            if (s && l) {
+              // both exist for this date — always prefer local, since it
+              // represents the user's own action (manual entry or a previous
+              // sync they then edited), while the server entry is just
+              // automation output
+              merged.push(l);
+            } else {
+              merged.push(s || l);
+            }
+          }
+          merged.sort((a, b) => (a.date < b.date ? -1 : 1));
           saveJSON(CHECKINS_KEY, merged);
           return merged;
         });
