@@ -1,0 +1,95 @@
+name: Add check-in entry
+
+"on":
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Date (YYYY-MM-DD), e.g. 2026-08-13. Leave blank for today."
+        required: false
+        type: string
+      rank:
+        description: "Rank number, e.g. 1"
+        required: true
+        type: string
+      total:
+        description: "Total players (optional), e.g. 163261"
+        required: false
+        type: string
+      note:
+        description: "Note (optional), e.g. 'Manual entry'"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Add check-in entry to leaderboard.json
+        run: |
+          DATE="${{ github.event.inputs.date }}"
+          RANK="${{ github.event.inputs.rank }}"
+          TOTAL="${{ github.event.inputs.total }}"
+          NOTE="${{ github.event.inputs.note }}"
+
+          # validate rank is a number
+          if ! [[ "$RANK" =~ ^[0-9]+$ ]]; then
+            echo "Error: rank '$RANK' is not a valid number."
+            exit 1
+          fi
+
+          # validate total if provided
+          if [[ -n "$TOTAL" ]] && ! [[ "$TOTAL" =~ ^[0-9]+$ ]]; then
+            echo "Error: total '$TOTAL' is not a valid number."
+            exit 1
+          fi
+
+          python3 -c "
+          import json, sys
+          from datetime import datetime
+
+          date = sys.argv[1].strip() or datetime.utcnow().strftime('%Y-%m-%d')
+          rank = int(sys.argv[2])
+          total = int(sys.argv[3]) if sys.argv[3].strip() else None
+          note = sys.argv[4].strip() or 'Manual entry (via Actions)'
+
+          # validate date format
+          try:
+              datetime.strptime(date, '%Y-%m-%d')
+          except ValueError:
+              print(f'Error: \"{date}\" is not a valid YYYY-MM-DD date.')
+              sys.exit(1)
+
+          path = 'data/leaderboard.json'
+          d = json.load(open(path))
+
+          checkins = d.get('checkins', [])
+          entry = {'date': date, 'rank': rank, 'total': total, 'note': note}
+
+          # replace existing entry for this date, or add new
+          checkins = [c for c in checkins if c.get('date') != date]
+          checkins.append(entry)
+          checkins.sort(key=lambda c: c['date'])
+          d['checkins'] = checkins
+
+          json.dump(d, open(path, 'w'), indent=2)
+          open(path, 'a').write('\n')
+          print(f'Added check-in: {entry}')
+          " "$DATE" "$RANK" "$TOTAL" "$NOTE"
+
+      - name: Commit if changed
+        run: |
+          git config user.name "leaderboard-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/leaderboard.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Add check-in entry (${{ github.event.inputs.date || 'today' }})"
+            git push
+          fi
