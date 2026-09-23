@@ -1,14 +1,14 @@
 {
   "updatedOn": "2026-09-22",
   "fetchedAt": "2026-09-22T13:52:13.701Z",
-  "totalPlayers": 162768,
-  "trackedRank": 2,
+  "totalPlayers": 165575,
+  "trackedRank": 1,
   "build": {
     "weapon": "Mistsplitter Reforged R5",
     "artifactSet": "Thundering Fury (4pc)",
-    "critRate": 80.8,
-    "critDmg": 262.3,
-    "atk": 2052,
+    "critRate": 77.7,
+    "critDmg": 274.7,
+    "atk": 2072,
     "dmgBonus": 73.6,
     "elementalMastery": 100,
     "avgDmg": 595809
@@ -18,15 +18,15 @@
     "rows": [
       {
         "rank": 1,
-        "nickname": "HX386",
-        "avgDmg": 596795,
-        "cv": 277.5
+        "nickname": "GH",
+        "avgDmg": 601043,
+        "cv": 287.7
       },
       {
         "rank": 2,
-        "nickname": "GH",
-        "avgDmg": 595809,
-        "cv": 281.4
+        "nickname": "HX386",
+        "avgDmg": 596795,
+        "cv": 277.5
       },
       {
         "rank": 3,
