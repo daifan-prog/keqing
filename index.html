@@ -218,6 +218,7 @@ function RankTracker() {
   const [hasSavedTop20, setHasSavedTop20] = useState(true);
   const [top20History, setTop20History] = useState(SEED_TOP20_HISTORY);
   const [expandedHistoryDate, setExpandedHistoryDate] = useState(null);
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [checkinLogOpen, setCheckinLogOpen] = useState(false);
   const [snapshotHistoryOpen, setSnapshotHistoryOpen] = useState(false);
 
@@ -624,12 +625,32 @@ function RankTracker() {
     return { ytdPercent, yearPercent, daysAtRank1YTD, daysElapsedYTD, daysLeftInYear, daysInYear, currentYear, totalDaysAtRank1, daysSinceAnchor, currentRank, currentStreak, chartPoints, maxRank, lastKnownTotal, percentile };
   }, [sorted, autoSync]);
 
+  const playerHistory = useMemo(() => {
+    if (!selectedPlayer || !top20History || top20History.length === 0) return [];
+    const entries = [];
+    // top20History is sorted newest first
+    for (const snapshot of top20History) {
+      const row = snapshot.rows.find((r) => r.nickname === selectedPlayer);
+      if (row) {
+        entries.push({ date: snapshot.updatedOn, rank: row.rank, avgDmg: row.avgDmg, cv: row.cv });
+      }
+    }
+    return entries; // newest first
+  }, [selectedPlayer, top20History]);
+
   useEffect(() => {
     if (!imageModalOpen) return;
     const onKey = (e) => { if (e.key === "Escape") setImageModalOpen(false); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [imageModalOpen]);
+
+  useEffect(() => {
+    if (!selectedPlayer) return;
+    const onKey = (e) => { if (e.key === "Escape") setSelectedPlayer(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedPlayer]);
 
   const ringPct = Math.min(100, stats.yearPercent);
 
@@ -1150,7 +1171,11 @@ function RankTracker() {
                         {row.rank === 1 ? <Icon.crown size={12} style={{ marginRight: 3, marginBottom: -1 }} /> : null}
                         {row.rank}
                       </span>
-                      <span style={changes.isNew ? styles.top20ColNameNew : styles.top20ColName}>
+                      <span
+                        style={{ ...(changes.isNew ? styles.top20ColNameNew : styles.top20ColName), cursor: row.nickname ? "pointer" : "default" }}
+                        onClick={() => row.nickname && setSelectedPlayer(row.nickname)}
+                        title={row.nickname ? `View ${row.nickname}'s history` : ""}
+                      >
                         {row.nickname || "—"}{changes.isNew ? " (new)" : ""}
                       </span>
                       <span style={changes.avgDmg ? styles.top20ColStatChanged : styles.top20ColStat}>
@@ -1225,7 +1250,11 @@ function RankTracker() {
                               {row.rank === 1 ? <Icon.crown size={12} style={{ marginRight: 3, marginBottom: -1 }} /> : null}
                               {row.rank}
                             </span>
-                            <span style={changes.isNew ? styles.top20ColNameNew : styles.top20ColName}>{row.nickname || "—"}</span>
+                            <span
+                              style={{ ...(changes.isNew ? styles.top20ColNameNew : styles.top20ColName), cursor: row.nickname ? "pointer" : "default" }}
+                              onClick={() => row.nickname && setSelectedPlayer(row.nickname)}
+                              title={row.nickname ? `View ${row.nickname}'s history` : ""}
+                            >{row.nickname || "—"}</span>
                             <span style={changes.avgDmg ? styles.top20ColStatChanged : styles.top20ColStat}>{row.avgDmg != null ? row.avgDmg.toLocaleString() : "—"}</span>
                             <span style={changes.cv ? styles.top20ColStatChanged : styles.top20ColStat}>{row.cv != null ? row.cv.toFixed(1) : "—"}</span>
                           </div>
@@ -1249,6 +1278,70 @@ function RankTracker() {
           {" "}— log check-ins here whenever you look it up.
         </div>
       </div>
+
+      {/* Player History Modal */}
+      {selectedPlayer && (
+        <div style={styles.playerHistoryOverlay} onClick={() => setSelectedPlayer(null)}>
+          <div style={styles.playerHistoryModal} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 20, fontWeight: 700, color: "#f3f0fb" }}>
+                {selectedPlayer}
+              </div>
+              <button onClick={() => setSelectedPlayer(null)} style={styles.playerHistoryClose}>✕</button>
+            </div>
+            {playerHistory.length === 0 ? (
+              <div style={{ color: "#9a90b8", fontSize: 13, textAlign: "center", padding: "20px 0" }}>
+                No history found for this player.
+              </div>
+            ) : (
+              <>
+                <div style={{ color: "#9a90b8", fontSize: 11, marginBottom: 10 }}>
+                  Appeared in {playerHistory.length} snapshot{playerHistory.length !== 1 ? "s" : ""}
+                  {" "}({fmtLong(playerHistory[playerHistory.length - 1].date)} — {fmtLong(playerHistory[0].date)})
+                </div>
+                <div style={styles.playerHistoryHeader}>
+                  <span style={{ width: 90 }}>Date</span>
+                  <span style={{ width: 46, textAlign: "right" }}>Rank</span>
+                  <span style={{ width: 88, textAlign: "right" }}>Avg DMG</span>
+                  <span style={{ width: 60, textAlign: "right" }}>CV</span>
+                </div>
+                <div style={styles.playerHistoryScroll}>
+                  {playerHistory.map((entry, i) => {
+                    const prev = playerHistory[i + 1]; // older entry
+                    const rankUp = prev && entry.rank < prev.rank;
+                    const rankDown = prev && entry.rank > prev.rank;
+                    const dmgChanged = prev && entry.avgDmg !== prev.avgDmg;
+                    const cvChanged = prev && entry.cv !== prev.cv;
+                    return (
+                      <div key={entry.date} style={styles.playerHistoryRow}>
+                        <span style={{ width: 90, color: "#9a90b8", fontSize: 12 }}>{fmtLong(entry.date)}</span>
+                        <span style={{
+                          width: 46, textAlign: "right", fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: 14,
+                          color: rankUp ? "#4ade80" : rankDown ? "#f87171" : "#e8e3f5",
+                        }}>
+                          {rankUp ? "▲" : rankDown ? "▼" : ""}{entry.rank}
+                        </span>
+                        <span style={{
+                          width: 88, textAlign: "right", fontFamily: "'JetBrains Mono',monospace", fontSize: 12.5,
+                          color: dmgChanged ? "#38bdf8" : "#9a90b8",
+                        }}>
+                          {entry.avgDmg != null ? entry.avgDmg.toLocaleString() : "—"}
+                        </span>
+                        <span style={{
+                          width: 60, textAlign: "right", fontFamily: "'JetBrains Mono',monospace", fontSize: 12.5,
+                          color: cvChanged ? "#38bdf8" : "#9a90b8",
+                        }}>
+                          {entry.cv != null ? entry.cv.toFixed(1) : "—"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1591,6 +1684,29 @@ const styles = {
     fontFamily: "'JetBrains Mono',monospace",
   },
   historyDateSub: { color: "#9a90b8", fontSize: 11.5, fontFamily: "'Inter',sans-serif" },
+  playerHistoryOverlay: {
+    position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+    background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center",
+    zIndex: 1000, padding: 16,
+  },
+  playerHistoryModal: {
+    background: "#1a1530", border: "1px solid #2a2246", borderRadius: 16, padding: "20px 22px",
+    maxWidth: 420, width: "100%", maxHeight: "80vh", display: "flex", flexDirection: "column",
+  },
+  playerHistoryClose: {
+    background: "none", border: "1px solid #2a2246", borderRadius: 8, color: "#9a90b8",
+    fontSize: 16, cursor: "pointer", padding: "4px 10px", lineHeight: 1,
+  },
+  playerHistoryHeader: {
+    display: "flex", gap: 10, padding: "0 4px 6px", fontSize: 10.5, letterSpacing: 0.5,
+    color: "#6b6289", textTransform: "uppercase", borderBottom: "1px solid #241c3f",
+  },
+  playerHistoryScroll: {
+    overflowY: "auto", flex: 1,
+  },
+  playerHistoryRow: {
+    display: "flex", gap: 10, padding: "7px 4px", borderBottom: "1px solid #201a38",
+  },
 };
 
 ReactDOM.createRoot(document.getElementById("root")).render(<RankTracker />);
