@@ -631,9 +631,10 @@ function RankTracker() {
   // so we can highlight exactly what changed to reach the current standings
   const previousTop20Snapshot = top20History.find((h) => h.updatedOn !== top20.updatedOn) || null;
 
-  const getRowChanges = (row) => {
-    if (!previousTop20Snapshot) return { rank: false, avgDmg: false, cv: false, isNew: false };
-    const prevRow = previousTop20Snapshot.rows.find((r) => r.nickname === row.nickname);
+  // Compare a row against its state in an older snapshot
+  const getRowChangesVs = (row, olderSnapshot) => {
+    if (!olderSnapshot) return { rank: false, avgDmg: false, cv: false, isNew: false };
+    const prevRow = olderSnapshot.rows.find((r) => r.nickname === row.nickname);
     if (!prevRow) return { rank: false, avgDmg: false, cv: false, isNew: true };
     return {
       rank: prevRow.rank !== row.rank,
@@ -642,6 +643,7 @@ function RankTracker() {
       isNew: false,
     };
   };
+  const getRowChanges = (row) => getRowChangesVs(row, previousTop20Snapshot);
   const daysSinceTop20Update = top20.updatedOn ? toIdx(todayIso()) - toIdx(top20.updatedOn) : null;
   const top20Overdue = daysSinceTop20Update !== null && daysSinceTop20Update >= 30;
   const circumference = 2 * Math.PI * 54;
@@ -1170,7 +1172,9 @@ function RankTracker() {
               </div>
             ) : (
               <div>
-                {top20History.map((h) => (
+                {top20History.map((h, hIdx) => {
+                  const olderSnapshot = top20History[hIdx + 1] || null;
+                  return (
                   <div key={h.updatedOn}>
                     <button
                       onClick={() => setExpandedHistoryDate(expandedHistoryDate === h.updatedOn ? null : h.updatedOn)}
@@ -1190,21 +1194,30 @@ function RankTracker() {
                           <span style={styles.top20ColStat}>Avg DMG</span>
                           <span style={styles.top20ColStat}>CV</span>
                         </div>
-                        {h.rows.map((row) => (
+                        {olderSnapshot && (
+                          <div style={styles.changeLegend}>
+                            <span style={styles.changeLegendDot} /> highlighted = changed since {fmtLong(olderSnapshot.updatedOn)}
+                          </div>
+                        )}
+                        {h.rows.map((row) => {
+                          const changes = getRowChangesVs(row, olderSnapshot);
+                          return (
                           <div key={row.rank} style={styles.top20Row(row.rank === 1)}>
-                            <span style={styles.top20ColRank}>
+                            <span style={changes.rank ? styles.top20ColRankChanged : styles.top20ColRank}>
                               {row.rank === 1 ? <Icon.crown size={12} style={{ marginRight: 3, marginBottom: -1 }} /> : null}
                               {row.rank}
                             </span>
-                            <span style={styles.top20ColName}>{row.nickname || "—"}</span>
-                            <span style={styles.top20ColStat}>{row.avgDmg != null ? row.avgDmg.toLocaleString() : "—"}</span>
-                            <span style={styles.top20ColStat}>{row.cv != null ? row.cv.toFixed(1) : "—"}</span>
+                            <span style={changes.isNew ? styles.top20ColNameNew : styles.top20ColName}>{row.nickname || "—"}</span>
+                            <span style={changes.avgDmg ? styles.top20ColStatChanged : styles.top20ColStat}>{row.avgDmg != null ? row.avgDmg.toLocaleString() : "—"}</span>
+                            <span style={changes.cv ? styles.top20ColStatChanged : styles.top20ColStat}>{row.cv != null ? row.cv.toFixed(1) : "—"}</span>
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )
             )}
