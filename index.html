@@ -458,7 +458,7 @@ function RankTracker() {
     setHasSavedTop20(true);
     setEditingTop20(false);
     const ok = saveJSON(TOP20_KEY, cleaned);
-    if (!ok) setErr("Top 20 saved for this session only — this browser's storage might be full or blocked.");
+    if (!ok) setErr("Top 50 saved for this session only — this browser's storage might be full or blocked.");
 
     const nextHistory = top20History
       .filter((h) => h.updatedOn !== cleaned.updatedOn)
@@ -825,7 +825,7 @@ function RankTracker() {
             My tracker
           </button>
           <button onClick={() => setActiveTab("top20")} style={styles.tabBtn(activeTab === "top20")}>
-            Top 20
+            Top 50
           </button>
         </div>
 
@@ -1070,7 +1070,7 @@ function RankTracker() {
           <>
           <div style={styles.panel}>
             <div style={styles.buildHeader}>
-              <div style={styles.panelTitle}>Top 20 — Keqing (TF)</div>
+              <div style={styles.panelTitle}>Top 50 — Keqing (TF)</div>
               <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
                 <a className="link" style={styles.link} href={BOARD_URL} target="_blank" rel="noopener noreferrer">
                   View live<Icon.external style={{ marginLeft: 3, marginBottom: -2 }} />
@@ -1079,7 +1079,7 @@ function RankTracker() {
                   <button
                     onClick={() => { setTop20Form(top20); setEditingTop20(true); }}
                     style={styles.iconBtn}
-                    aria-label="Edit top 20"
+                    aria-label="Edit top 50"
                   >
                     <Icon.pencil size={13} />
                   </button>
@@ -1095,7 +1095,7 @@ function RankTracker() {
 
             {top20Overdue && !editingTop20 && (
               <div style={styles.overdueBanner}>
-                <Icon.bolt size={13} /> It's been {daysSinceTop20Update} days since your last check — head to akasha.cv and update your Top 20.
+                <Icon.bolt size={13} /> It's been {daysSinceTop20Update} days since your last check — head to akasha.cv and update your Top 50.
               </div>
             )}
 
@@ -1140,7 +1140,7 @@ function RankTracker() {
                   ))}
                 </div>
                 <button onClick={saveTop20} style={{ ...styles.button, marginTop: 12 }}>
-                  <Icon.plus size={14} /> Save Top 20
+                  <Icon.plus size={14} /> Save Top 50
                 </button>
               </div>
             ) : (
@@ -1205,7 +1205,7 @@ function RankTracker() {
             {snapshotHistoryOpen && (
             top20History.length <= 1 ? (
               <div style={styles.top20EditHint}>
-                No earlier snapshots yet — the next time you update the Top 20, this one gets archived here so you can compare over time.
+                No earlier snapshots yet — the next time you update the Top 50, this one gets archived here so you can compare over time.
               </div>
             ) : (
               <div>

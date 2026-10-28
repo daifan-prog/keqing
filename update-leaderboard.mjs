@@ -18,7 +18,7 @@ const TRACKED_UID = "602489073"; // GH
 
 const LEADERBOARD_PAGE_URL = `https://akasha.cv/leaderboards/${CALCULATION_ID}/${VARIANT}`;
 const LEADERBOARD_API_URL =
-  `https://akasha.cv/api/leaderboards?sort=calculation.result&order=-1&size=20&page=1` +
+  `https://akasha.cv/api/leaderboards?sort=calculation.result&order=-1&size=50&page=1` +
   `&filter=&uids=&p=&fromId=&li=&variant=${VARIANT}&calculationId=${CALCULATION_ID}`;
 
 function refinementLabel(value) {
@@ -65,53 +65,41 @@ async function main() {
   console.log("Establishing a real browser session on akasha.cv…");
   await page.goto(LEADERBOARD_PAGE_URL, { waitUntil: "domcontentloaded", timeout: 45000 });
 
-  console.log("Fetching leaderboard API from within the browser context…");
-  const json = await page.evaluate(async (url) => {
-    const res = await fetch(url);
+  console.log("Fetching leaderboard data + total player count…");
+  const result = await page.evaluate(async (apiUrl) => {
+    const res = await fetch(apiUrl);
     if (!res.ok) throw new Error(`Leaderboard fetch failed: ${res.status}`);
-    return res.json();
+    const json = await res.json();
+
+    // try to get the total player count — this endpoint is consistently
+    // blocked from GitHub Actions' IPs (403), so this is best-effort only;
+    // the carry-forward logic below preserves the last known good value
+    let totalRows = null;
+    if (json.totalRowsHash) {
+      try {
+        const sizeRes = await fetch(
+          `https://akasha.cv/api/getCollectionSize/?variant=charactersLb&hash=${json.totalRowsHash}`
+        );
+        if (sizeRes.ok) {
+          const sizeJson = await sizeRes.json();
+          totalRows = sizeJson?.totalRows ?? null;
+        }
+      } catch (e) {
+        // blocked — expected, handled by carry-forward below
+      }
+    }
+
+    return { json, totalRows };
   }, LEADERBOARD_API_URL);
 
+  const json = result.json;
   const rows = json.data || [];
-  console.log(`Got ${rows.length} rows.`);
-
-  let totalPlayers = null;
-
-  // Method 1 (preferred): scrape the total from the page's own pagination text
-  // (e.g. "1-20 of 163,261") — the page is already loaded in our browser session,
-  // and this has proven reliable even when the separate getCollectionSize API
-  // endpoint is blocked from GitHub's IPs
-  try {
-    await page.waitForTimeout(2000); // let pagination render
-    totalPlayers = await page.evaluate(() => {
-      const text = document.body.innerText.replace(/,/g, "");
-      const match = text.match(/\d+-\d+ of (\d+)/);
-      return match ? parseInt(match[1], 10) : null;
-    });
-    if (totalPlayers) console.log(`Total players from page pagination: ${totalPlayers}`);
-  } catch (err) {
-    console.error("Couldn't scrape total from page (non-fatal):", err.message);
-  }
-
-  // Method 2 (fallback): try the dedicated API endpoint in case it works
-  if (!totalPlayers && json.totalRowsHash) {
-    console.log("Trying getCollectionSize API as fallback…");
-    try {
-      const sizeJson = await page.evaluate(async (hash) => {
-        const res = await fetch(`https://akasha.cv/api/getCollectionSize/?variant=charactersLb&hash=${hash}`);
-        if (!res.ok) throw new Error(`getCollectionSize failed: ${res.status}`);
-        return res.json();
-      }, json.totalRowsHash);
-      totalPlayers = sizeJson?.totalRows ?? null;
-      if (totalPlayers) console.log(`Total players from API: ${totalPlayers}`);
-    } catch (err) {
-      console.error("getCollectionSize also failed (non-fatal):", err.message);
-    }
-  }
+  let totalPlayers = result.totalRows;
+  console.log(`Got ${rows.length} rows. totalPlayers: ${totalPlayers ?? "blocked — will carry forward"}`);
 
   await browser.close();
 
-  const top20Rows = rows.slice(0, 20).map((entry, i) => ({
+  const top20Rows = rows.slice(0, 50).map((entry, i) => ({
     rank: i + 1,
     nickname: entry.owner?.nickname || "",
     avgDmg: entry.calculation?.result != null ? Math.round(entry.calculation.result) : null,
