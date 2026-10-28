@@ -1120,7 +1120,11 @@ function RankTracker() {
               <>
               {previousTop20Snapshot && (
                 <div style={styles.changeLegend}>
-                  <span style={styles.changeLegendDot} /> highlighted = changed since {fmtLong(previousTop20Snapshot.updatedOn)}
+                  <span style={styles.changeLegendDot} /> changed stat/rank
+                  <span style={{ width: 6 }} />
+                  <span style={styles.changeLegendDotNew} /> new player
+                  <span style={{ width: 6 }} />
+                  <span style={{ color: "#6b6289" }}>since {fmtLong(previousTop20Snapshot.updatedOn)}</span>
                 </div>
               )}
               <div style={styles.top20Table}>
@@ -1196,7 +1200,11 @@ function RankTracker() {
                         </div>
                         {olderSnapshot && (
                           <div style={styles.changeLegend}>
-                            <span style={styles.changeLegendDot} /> highlighted = changed since {fmtLong(olderSnapshot.updatedOn)}
+                            <span style={styles.changeLegendDot} /> changed stat/rank
+                            <span style={{ width: 6 }} />
+                            <span style={styles.changeLegendDotNew} /> new player
+                            <span style={{ width: 6 }} />
+                            <span style={{ color: "#6b6289" }}>since {fmtLong(olderSnapshot.updatedOn)}</span>
                           </div>
                         )}
                         {h.rows.map((row) => {
@@ -1545,11 +1553,15 @@ const styles = {
     background: "rgba(242,193,78,0.15)", borderRadius: 4, padding: "1px 3px", margin: "-1px -3px",
   },
   changeLegend: {
-    display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#9a90b8", marginBottom: 10,
+    display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#9a90b8", marginBottom: 10, flexWrap: "wrap",
   },
   changeLegendDot: {
     width: 10, height: 10, borderRadius: 3, background: "rgba(242,193,78,0.35)", border: "1px solid rgba(242,193,78,0.6)",
-    display: "inline-block",
+    display: "inline-block", flexShrink: 0,
+  },
+  changeLegendDotNew: {
+    width: 10, height: 10, borderRadius: 3, background: "rgba(168,85,247,0.35)", border: "1px solid rgba(168,85,247,0.6)",
+    display: "inline-block", flexShrink: 0,
   },
   top20InputName: { flex: 1, width: "auto" },
   top20InputStat: { width: 88, flexShrink: 0, textAlign: "right" },
