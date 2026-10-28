@@ -1,12 +1,11 @@
 name: Update total players
 
-"on":
+on:
   workflow_dispatch:
     inputs:
       total:
-        description: "Current total player count from akasha.cv (e.g. 163261)"
+        description: "Total number of players on the leaderboard"
         required: true
-        type: string
 
 permissions:
   contents: write
@@ -18,44 +17,48 @@ jobs:
       - name: Check out repo
         uses: actions/checkout@v4
 
-      - name: Update totalPlayers in leaderboard.json
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Update total players
         run: |
           TOTAL="${{ github.event.inputs.total }}"
-          # validate it's actually a number
           if ! [[ "$TOTAL" =~ ^[0-9]+$ ]]; then
-            echo "Error: '$TOTAL' is not a valid number."
+            echo "Error: '$TOTAL' is not a valid number"
             exit 1
           fi
 
-          echo "Updating totalPlayers to $TOTAL…"
+          node -e "
+            const fs = require('fs');
+            const data = JSON.parse(fs.readFileSync('data/leaderboard.json', 'utf8'));
 
-          # update totalPlayers at the top level
-          python3 -c "
-          import json, sys
-          total = int(sys.argv[1])
-          path = 'data/leaderboard.json'
-          d = json.load(open(path))
-          d['totalPlayers'] = total
+            data.totalPlayers = Number($TOTAL);
 
-          # also update today's check-in entry if it exists and has null/old total
-          today = d.get('updatedOn', '')
-          for c in d.get('checkins', []):
-              if c.get('date') == today:
-                  c['total'] = total
+            // Also update today's checkin if one exists
+            const today = new Intl.DateTimeFormat('en-CA', {
+              timeZone: 'America/Los_Angeles',
+              year: 'numeric', month: '2-digit', day: '2-digit'
+            }).format(new Date());
 
-          json.dump(d, open(path, 'w'), indent=2)
-          open(path, 'a').write('\n')
-          print(f'Updated totalPlayers to {total}')
-          " "$TOTAL"
+            const idx = data.checkins.findIndex(c => c.date === today);
+            if (idx >= 0) {
+              data.checkins[idx].total = Number($TOTAL);
+            }
 
-      - name: Commit if changed
+            fs.writeFileSync('data/leaderboard.json', JSON.stringify(data, null, 2));
+            console.log('Updated totalPlayers to', $TOTAL);
+          "
+
+      - name: Commit
         run: |
           git config user.name "leaderboard-bot"
-          git config user.email "actions@users.noreply.github.com"
+          git config user.email "bot@users.noreply.github.com"
           git add data/leaderboard.json
           if git diff --cached --quiet; then
-            echo "No changes to commit."
+            echo "No changes."
           else
-            git commit -m "Update total players to ${{ github.event.inputs.total }}"
+            git commit -m "chore: update total players to ${{ github.event.inputs.total }} [manual]"
             git push
           fi

@@ -1,10 +1,10 @@
 name: Update leaderboard data
 
-"on":
+on:
   schedule:
-    # runs once a day at 09:00 UTC — edit the cron expression to change the time
-    - cron: "0 9 * * *"
-  workflow_dispatch: {} # lets you also trigger it manually from the Actions tab
+    - cron: "0 9 * * *"   # 2 AM PT (9 AM UTC)
+    - cron: "0 17 * * *"  # 10 AM PT (5 PM UTC) — redundancy trigger
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -19,13 +19,13 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: 20
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Install Playwright's browser
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium --with-deps
 
       - name: Fetch latest leaderboard data
         run: node scripts/update-leaderboard.mjs
@@ -33,19 +33,23 @@ jobs:
       - name: Capture fresh build screenshot
         run: node scripts/screenshot-build.mjs
 
-      - name: Commit updated data if it changed
+      - name: Commit updated data if changed
         run: |
           git config user.name "leaderboard-bot"
-          git config user.email "actions@users.noreply.github.com"
-          git add data/leaderboard.json
-          if [ -f data/build-screenshot.png ]; then
-            git add data/build-screenshot.png
-          else
-            echo "No data/build-screenshot.png present yet — skipping it this run."
-          fi
+          git config user.email "bot@users.noreply.github.com"
+
+          # Only add files that actually exist
+          for f in data/leaderboard.json data/build-screenshot.png; do
+            if [ -f "$f" ]; then
+              git add "$f"
+            else
+              echo "Skipping $f (not found)"
+            fi
+          done
+
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
-            git commit -m "Update leaderboard data ($(date -u +%Y-%m-%d))"
+            git commit -m "chore: update leaderboard data [automated]"
             git push
           fi
