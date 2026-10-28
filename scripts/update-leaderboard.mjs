@@ -18,7 +18,7 @@ const TRACKED_UID = "602489073"; // GH
 
 const LEADERBOARD_PAGE_URL = `https://akasha.cv/leaderboards/${CALCULATION_ID}/${VARIANT}`;
 const LEADERBOARD_API_URL =
-  `https://akasha.cv/api/leaderboards?sort=calculation.result&order=-1&size=20&page=1` +
+  `https://akasha.cv/api/leaderboards?sort=calculation.result&order=-1&size=50&page=1` +
   `&filter=&uids=&p=&fromId=&li=&variant=${VARIANT}&calculationId=${CALCULATION_ID}`;
 
 function refinementLabel(value) {
@@ -99,7 +99,7 @@ async function main() {
 
   await browser.close();
 
-  const top20Rows = rows.slice(0, 20).map((entry, i) => ({
+  const top20Rows = rows.slice(0, 50).map((entry, i) => ({
     rank: i + 1,
     nickname: entry.owner?.nickname || "",
     avgDmg: entry.calculation?.result != null ? Math.round(entry.calculation.result) : null,
