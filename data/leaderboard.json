@@ -1,6 +1,6 @@
 {
   "updatedOn": "2026-11-07",
-  "fetchedAt": "2026-11-07T15:21:54.435Z",
+  "fetchedAt": "2026-11-07T20:38:56.146Z",
   "totalPlayers": 167720,
   "trackedRank": 1,
   "build": {
@@ -42,15 +42,15 @@
       },
       {
         "rank": 5,
-        "nickname": "冷酷、晴姐",
-        "avgDmg": 588426,
-        "cv": 293.1
+        "nickname": "Yuki",
+        "avgDmg": 589017,
+        "cv": 285.3
       },
       {
         "rank": 6,
-        "nickname": "Yuki",
-        "avgDmg": 587578,
-        "cv": 277.5
+        "nickname": "冷酷、晴姐",
+        "avgDmg": 588426,
+        "cv": 293.1
       },
       {
         "rank": 7,
@@ -348,15 +348,15 @@
         },
         {
           "rank": 5,
-          "nickname": "冷酷、晴姐",
-          "avgDmg": 588426,
-          "cv": 293.1
+          "nickname": "Yuki",
+          "avgDmg": 589017,
+          "cv": 285.3
         },
         {
           "rank": 6,
-          "nickname": "Yuki",
-          "avgDmg": 587578,
-          "cv": 277.5
+          "nickname": "冷酷、晴姐",
+          "avgDmg": 588426,
+          "cv": 293.1
         },
         {
           "rank": 7,
