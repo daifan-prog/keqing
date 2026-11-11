@@ -1,6 +1,6 @@
 {
   "updatedOn": "2026-11-11",
-  "fetchedAt": "2026-11-11T16:55:56.681Z",
+  "fetchedAt": "2026-11-11T23:15:54.119Z",
   "totalPlayers": 167720,
   "trackedRank": 1,
   "build": {
@@ -42,45 +42,45 @@
       },
       {
         "rank": 5,
-        "nickname": "Yuki",
-        "avgDmg": 589017,
-        "cv": 285.3
-      },
-      {
-        "rank": 6,
         "nickname": "冷酷、晴姐",
         "avgDmg": 588426,
         "cv": 293.1
       },
       {
-        "rank": 7,
+        "rank": 6,
         "nickname": "ArchedNosi",
         "avgDmg": 587474,
         "cv": 284.5
       },
       {
-        "rank": 8,
+        "rank": 7,
         "nickname": "kazoo",
         "avgDmg": 586935,
         "cv": 274.4
       },
       {
-        "rank": 9,
+        "rank": 8,
         "nickname": "Cuwei",
         "avgDmg": 586464,
         "cv": 287.6
       },
       {
-        "rank": 10,
+        "rank": 9,
         "nickname": "Shinory",
         "avgDmg": 585462,
         "cv": 255.8
       },
       {
-        "rank": 11,
+        "rank": 10,
         "nickname": "˚ʚ라임ɞ˚",
         "avgDmg": 584660,
         "cv": 267.4
+      },
+      {
+        "rank": 11,
+        "nickname": "Yuki",
+        "avgDmg": 584617,
+        "cv": 269
       },
       {
         "rank": 12,
@@ -348,45 +348,45 @@
         },
         {
           "rank": 5,
-          "nickname": "Yuki",
-          "avgDmg": 589017,
-          "cv": 285.3
-        },
-        {
-          "rank": 6,
           "nickname": "冷酷、晴姐",
           "avgDmg": 588426,
           "cv": 293.1
         },
         {
-          "rank": 7,
+          "rank": 6,
           "nickname": "ArchedNosi",
           "avgDmg": 587474,
           "cv": 284.5
         },
         {
-          "rank": 8,
+          "rank": 7,
           "nickname": "kazoo",
           "avgDmg": 586935,
           "cv": 274.4
         },
         {
-          "rank": 9,
+          "rank": 8,
           "nickname": "Cuwei",
           "avgDmg": 586464,
           "cv": 287.6
         },
         {
-          "rank": 10,
+          "rank": 9,
           "nickname": "Shinory",
           "avgDmg": 585462,
           "cv": 255.8
         },
         {
-          "rank": 11,
+          "rank": 10,
           "nickname": "˚ʚ라임ɞ˚",
           "avgDmg": 584660,
           "cv": 267.4
+        },
+        {
+          "rank": 11,
+          "nickname": "Yuki",
+          "avgDmg": 584617,
+          "cv": 269
         },
         {
           "rank": 12,
