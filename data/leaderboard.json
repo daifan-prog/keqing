@@ -1,6 +1,6 @@
 {
   "updatedOn": "2026-11-26",
-  "fetchedAt": "2026-11-26T18:47:05.806Z",
+  "fetchedAt": "2026-11-27T00:55:20.895Z",
   "totalPlayers": 167720,
   "trackedRank": 1,
   "build": {
@@ -312,13 +312,318 @@
       },
       {
         "rank": 50,
-        "nickname": "touchgrass",
-        "avgDmg": 569485,
-        "cv": 255
+        "nickname": "Shelter",
+        "avgDmg": 569626,
+        "cv": 269
       }
     ]
   },
   "top20History": [
+    {
+      "updatedOn": "2026-11-26",
+      "rows": [
+        {
+          "rank": 1,
+          "nickname": "GH",
+          "avgDmg": 601043,
+          "cv": 287.7
+        },
+        {
+          "rank": 2,
+          "nickname": "HX386",
+          "avgDmg": 596795,
+          "cv": 277.5
+        },
+        {
+          "rank": 3,
+          "nickname": "沐悠甘青",
+          "avgDmg": 595049,
+          "cv": 268.2
+        },
+        {
+          "rank": 4,
+          "nickname": "ゼロ",
+          "avgDmg": 590236,
+          "cv": 263.5
+        },
+        {
+          "rank": 5,
+          "nickname": "冷酷、晴姐",
+          "avgDmg": 588426,
+          "cv": 293.1
+        },
+        {
+          "rank": 6,
+          "nickname": "ArchedNosi",
+          "avgDmg": 587474,
+          "cv": 284.5
+        },
+        {
+          "rank": 7,
+          "nickname": "Cuwei",
+          "avgDmg": 586464,
+          "cv": 287.6
+        },
+        {
+          "rank": 8,
+          "nickname": "厳選脳もろこし",
+          "avgDmg": 585479,
+          "cv": 274.4
+        },
+        {
+          "rank": 9,
+          "nickname": "Shinory",
+          "avgDmg": 585462,
+          "cv": 255.8
+        },
+        {
+          "rank": 10,
+          "nickname": "˚ʚ라임ɞ˚",
+          "avgDmg": 584660,
+          "cv": 267.4
+        },
+        {
+          "rank": 11,
+          "nickname": "Yuki",
+          "avgDmg": 584617,
+          "cv": 269
+        },
+        {
+          "rank": 12,
+          "nickname": "まぐ",
+          "avgDmg": 584253,
+          "cv": 259.6
+        },
+        {
+          "rank": 13,
+          "nickname": "霜羽真下",
+          "avgDmg": 584244,
+          "cv": 268.2
+        },
+        {
+          "rank": 14,
+          "nickname": "龍吟夙帝煌",
+          "avgDmg": 583664,
+          "cv": 283
+        },
+        {
+          "rank": 15,
+          "nickname": "keipisu",
+          "avgDmg": 583634,
+          "cv": 287.6
+        },
+        {
+          "rank": 16,
+          "nickname": "青空夜空",
+          "avgDmg": 583192,
+          "cv": 269.7
+        },
+        {
+          "rank": 17,
+          "nickname": "Tobit",
+          "avgDmg": 582193,
+          "cv": 260.5
+        },
+        {
+          "rank": 18,
+          "nickname": "kazoo",
+          "avgDmg": 581706,
+          "cv": 274.4
+        },
+        {
+          "rank": 19,
+          "nickname": "ベロ",
+          "avgDmg": 580805,
+          "cv": 265.1
+        },
+        {
+          "rank": 20,
+          "nickname": "take",
+          "avgDmg": 580498,
+          "cv": 277.5
+        },
+        {
+          "rank": 21,
+          "nickname": "七晴",
+          "avgDmg": 580103,
+          "cv": 263.5
+        },
+        {
+          "rank": 22,
+          "nickname": "紫色电电猫",
+          "avgDmg": 579782,
+          "cv": 282.1
+        },
+        {
+          "rank": 23,
+          "nickname": "春凪",
+          "avgDmg": 577980,
+          "cv": 247.2
+        },
+        {
+          "rank": 24,
+          "nickname": "いであ",
+          "avgDmg": 577638,
+          "cv": 257.4
+        },
+        {
+          "rank": 25,
+          "nickname": "守到晴来",
+          "avgDmg": 577457,
+          "cv": 293
+        },
+        {
+          "rank": 26,
+          "nickname": "Ruu",
+          "avgDmg": 577027,
+          "cv": 287.6
+        },
+        {
+          "rank": 27,
+          "nickname": "小零通",
+          "avgDmg": 576763,
+          "cv": 269.7
+        },
+        {
+          "rank": 28,
+          "nickname": "Ei",
+          "avgDmg": 576448,
+          "cv": 265.1
+        },
+        {
+          "rank": 29,
+          "nickname": "Aether",
+          "avgDmg": 576273,
+          "cv": 264.3
+        },
+        {
+          "rank": 30,
+          "nickname": "仓颉",
+          "avgDmg": 576156,
+          "cv": 255.8
+        },
+        {
+          "rank": 31,
+          "nickname": "苏苏猫猫头",
+          "avgDmg": 575601,
+          "cv": 270.5
+        },
+        {
+          "rank": 32,
+          "nickname": "ほな",
+          "avgDmg": 575200,
+          "cv": 269.7
+        },
+        {
+          "rank": 33,
+          "nickname": "Firesnake",
+          "avgDmg": 574457,
+          "cv": 281.4
+        },
+        {
+          "rank": 34,
+          "nickname": "Maxine",
+          "avgDmg": 574319,
+          "cv": 261.2
+        },
+        {
+          "rank": 35,
+          "nickname": "CyberHulk",
+          "avgDmg": 573343,
+          "cv": 270.5
+        },
+        {
+          "rank": 36,
+          "nickname": "せと",
+          "avgDmg": 573211,
+          "cv": 270.5
+        },
+        {
+          "rank": 37,
+          "nickname": "ちゃま",
+          "avgDmg": 573093,
+          "cv": 273.6
+        },
+        {
+          "rank": 38,
+          "nickname": "日日晴",
+          "avgDmg": 572325,
+          "cv": 276.8
+        },
+        {
+          "rank": 39,
+          "nickname": "ロード",
+          "avgDmg": 572192,
+          "cv": 262.8
+        },
+        {
+          "rank": 40,
+          "nickname": "玉衡",
+          "avgDmg": 571760,
+          "cv": 286.1
+        },
+        {
+          "rank": 41,
+          "nickname": "ハティ",
+          "avgDmg": 571599,
+          "cv": 280.6
+        },
+        {
+          "rank": 42,
+          "nickname": "前ちゃん",
+          "avgDmg": 571452,
+          "cv": 258.1
+        },
+        {
+          "rank": 43,
+          "nickname": "ShizuTempest",
+          "avgDmg": 571420,
+          "cv": 263.5
+        },
+        {
+          "rank": 44,
+          "nickname": "雷華",
+          "avgDmg": 571221,
+          "cv": 265.1
+        },
+        {
+          "rank": 45,
+          "nickname": "Tori",
+          "avgDmg": 570954,
+          "cv": 266.6
+        },
+        {
+          "rank": 46,
+          "nickname": "Su",
+          "avgDmg": 570277,
+          "cv": 267.4
+        },
+        {
+          "rank": 47,
+          "nickname": "Chocolatito",
+          "avgDmg": 570171,
+          "cv": 267.4
+        },
+        {
+          "rank": 48,
+          "nickname": "ぼ",
+          "avgDmg": 569940,
+          "cv": 265.8
+        },
+        {
+          "rank": 49,
+          "nickname": "小鳥遊朔夜",
+          "avgDmg": 569718,
+          "cv": 272.1
+        },
+        {
+          "rank": 50,
+          "nickname": "Shelter",
+          "avgDmg": 569626,
+          "cv": 269
+        }
+      ]
+    },
     {
       "updatedOn": "2026-11-24",
       "rows": [
